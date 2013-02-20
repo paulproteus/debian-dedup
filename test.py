@@ -2,6 +2,7 @@
 """
 CREATE TABLE package (package TEXT PRIMARY KEY, version TEXT, architecture TEXT);
 CREATE TABLE content (package TEXT, filename TEXT, size INTEGER, function TEXT, hash TEXT, FOREIGN KEY (package) REFERENCES package(package));
+CREATE TABLE dependency (package TEXT, required TEXT, FOREIGN KEY (package) REFERENCES package(package), FOREIGN KEY (required) REFERENCES package(package));
 CREATE INDEX content_package_index ON content (package);
 CREATE INDEX content_hash_index ON content (hash);
 """
@@ -286,6 +287,10 @@ def process_package(db, filelike):
                 depends = control.relations.get("depends", [])
                 depends = set(dep[0]["name"].encode("ascii")
                               for dep in depends if len(dep) == 1)
+                cur.execute("DELETE FROM dependency WHERE package = ?;",
+                            (package,))
+                cur.executemany("INSERT INTO dependency (package, required) VALUES (?, ?);",
+                                ((package, dep) for dep in depends))
                 break
             continue
         elif name == "data.tar.gz":
