@@ -80,6 +80,7 @@ class Application(object):
         self.db = sqlite3.connect("test.sqlite3")
         self.cur = self.db.cursor()
         self.routingmap = Map([
+            Rule("/", methods=("GET",), endpoint="index"),
             Rule("/binary/<package>", methods=("GET",), endpoint="package"),
             Rule("/compare/<package1>/<package2>", methods=("GET",), endpoint="detail"),
             Rule("/hash/<function>/<hashvalue>", methods=("GET",), endpoint="hash"),
@@ -96,6 +97,15 @@ class Application(object):
                 return self.show_detail(args["package1"], args["package2"])
             elif endpoint == "hash":
                 return self.show_hash(args["function"], args["hashvalue"])
+            elif endpoint == "index":
+                return Response("""<html><head><title>Debian duplication detector</title></head>
+<body><h1>Debian duplication detector</h1>
+<ul>
+<li>To inspect a particlar binary package, go to <pre>binary/&lt;packagename&gt;</pre> Example: <a href="binary/git">binary/git</a></li>
+<li>To inspect a combination of binary packages go to <pre>compare/&lt;firstpackage&gt;/&lt;secondpackage&gt;</pre> Example: <a href="compare/git/git">compare/git/git</a></li>
+<li>To discover package shipping a particular file go to <pre>hash/sha512/&lt;hashvalue&gt;</pre> Example: <a href="hash/sha512/ed94df7781793f06f9426a600c1bde86397afc7b35cb3aa11b60214bd31e35ad893b53a04a2cf4676154982d7c204c4aa165d6ccdaac0170031364a05dbab3bc">hash/sha512/ed94df7781793f06f9426a600c1bde86397afc7b35cb3aa11b60214bd31e35ad893b53a04a2cf4676154982d7c204c4aa165d6ccdaac0170031364a05dbab3bc</a></li>
+<ul></body></html>""",
+                                content_type="text/html")
             raise NotFound()
         except HTTPException as e:
             return e
