@@ -28,7 +28,7 @@ def format_size(size):
 jinjaenv.filters["format_size"] = format_size
 
 package_template = jinjaenv.from_string(
-"""<html><head><title>duplication of {{ package|e }}</title></head>
+"""<html><head><title>duplication of {{ package|e }}</title><style type="text/css">.dependency { background-color: yellow; } </style></head>
 <body><h1>{{ package|e }}</h1>
 <p>Version: {{ version|e }}</p>
 <p>Architecture: {{ architecture|e }}</p>
@@ -39,7 +39,8 @@ package_template = jinjaenv.from_string(
         <h3>sharing with respect to {{ function }}</h3>
         <table border='1'><tr><th>package</th><th>files shared</th><th>data shared</th></tr>
         {%- for entry in sharing|sort(attribute="savable", reverse=true) -%}
-            <tr><td>{% if entry.package %}<a href="{{ entry.package|e }}">{{ entry.package|e }}</a>{% else %}self{% endif %}
+            <tr><td{% if not entry.package or entry.package in dependencies %} class="dependency"{% endif %}>
+                {%- if entry.package %}<a href="{{ entry.package|e }}">{{ entry.package|e }}</a>{% else %}self{% endif %}
                 <a href="../compare/{{ package|e }}/{{ entry.package|default(package, true)|e }}">compare</a></td>
             <td>{{ entry.duplicate }} ({{ (100 * entry.duplicate / num_files)|int }}%)</td>
             <td>{{ entry.savable|format_size }} ({{ (100 * entry.savable / total_size)|int }}%)</td></tr>
@@ -115,8 +116,14 @@ class Application(object):
         details.update(dict(num_files=num_files, total_size=total_size))
         return details
 
+    def get_dependencies(self, package):
+        self.cur.execute("SELECT required FROM dependency WHERE package = ?;",
+                         (package,))
+        return set(row[0] for row in self.cur.fetchall())
+
     def show_package(self, package):
         params = self.get_details(package)
+        params["dependencies"] = self.get_dependencies(package)
 
         shared = dict()
         self.cur.execute("SELECT a.filename, a.function, a.hash, a.size, b.package FROM content AS a JOIN content AS b ON a.function = b.function AND a.hash = b.hash WHERE a.package = ? AND (a.filename != b.filename OR b.package != ?);",
