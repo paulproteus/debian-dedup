@@ -313,9 +313,7 @@ def process_package(db, filelike):
 
 def main():
     db = sqlite3.connect("test.sqlite3")
-
-    with open(sys.argv[1]) as pkg:
-        process_package(db, pkg)
+    process_package(db, sys.stdin)
 
 if __name__ == "__main__":
     main()
