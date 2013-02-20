@@ -4,7 +4,6 @@ import sqlite3
 from wsgiref.simple_server import make_server
 
 import jinja2
-from werkzeug.debug import DebuggedApplication
 from werkzeug.exceptions import HTTPException, NotFound
 from werkzeug.routing import Map, Rule
 from werkzeug.wrappers import Request, Response

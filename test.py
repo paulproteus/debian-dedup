@@ -7,7 +7,6 @@ CREATE INDEX content_hash_index ON content (hash);
 """
 
 import hashlib
-import os
 import re
 import sqlite3
 import struct
@@ -53,7 +52,7 @@ class ArReader(object):
             length = int(parts[5])
             if self.membertest(name):
                 self.remaining = length
-                return name, length
+                return name
             self.skip(length + length % 2)
 
     def read(self, length=None):
@@ -64,9 +63,6 @@ class ArReader(object):
         data = self.fileobj.read(length)
         self.remaining -= len(data)
         return data
-
-    def close(self):
-        self.fileobj.close()
 
 class XzStream(object):
     blocksize = 65536
@@ -234,7 +230,7 @@ def gziphash():
 
 def get_hashes(filelike):
     af = ArReader(filelike, lambda name: name.startswith("data.tar"))
-    name, membersize = af.skiptillmember()
+    name = af.skiptillmember()
     if name == "data.tar.gz":
         tf = tarfile.open(fileobj=af, mode="r|gz")
     elif name == "data.tar.bz2":
@@ -245,8 +241,6 @@ def get_hashes(filelike):
     else:
         raise ValueError("unsupported compression %r" % name)
     for elem in tf:
-        if elem.size == 0: # boring
-            continue
         if not elem.isreg(): # excludes hard links as well
             continue
         hasher = MultiHash(sha512_nontrivial(), gziphash())
