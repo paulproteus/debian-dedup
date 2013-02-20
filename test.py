@@ -7,17 +7,15 @@ CREATE INDEX content_hash_index ON content (hash);
 """
 
 import hashlib
-import re
 import sqlite3
 import struct
 import sys
 import tarfile
 import zlib
 
-import apt_pkg
+from debian.debian_support import version_compare
+from debian import deb822
 import lzma
-
-apt_pkg.init()
 
 class ArReader(object):
     global_magic = b"!<arch>\n"
@@ -235,16 +233,62 @@ def gziphash():
     hashobj.name = "gzip_sha512"
     return HashBlacklist(hashobj, boring_sha512_hashes)
 
-def get_hashes(filelike):
+def get_hashes(tar):
+    for elem in tar:
+        if not elem.isreg(): # excludes hard links as well
+            continue
+        hasher = MultiHash(sha512_nontrivial(), gziphash())
+        hasher = hash_file(hasher, tar.extractfile(elem))
+        for hashobj in hasher.hashes:
+            hashvalue = hashobj.hexdigest()
+            if hashvalue:
+                yield (elem.name, elem.size, hashobj.name, hashvalue)
+
+def process_package(db, filelike):
+    cur = db.cursor()
     af = ArReader(filelike)
     af.read_magic()
-    tf = None
+    state = "start"
     while True:
         try:
             name = af.read_entry()
         except EOFError:
-            return
-        if name == "data.tar.gz":
+            break
+        if name == "control.tar.gz":
+            if state != "start":
+                raise ValueError("unexpected control.tar.gz")
+            state = "control"
+            tf = tarfile.open(fileobj=af, mode="r|gz")
+            for elem in tf:
+                if elem.name != "./control":
+                    continue
+                if state != "control":
+                    raise ValueError("duplicate control file")
+                state = "control_file"
+                control = tf.extractfile(elem).read()
+                control = deb822.Packages(control)
+                package = control["package"].encode("ascii")
+                version = control["version"].encode("ascii")
+                architecture = control["architecture"].encode("ascii")
+
+                cur.execute("SELECT version FROM package WHERE package = ?;",
+                            (package,))
+                row = cur.fetchone()
+                if row and version_compare(row[0], version) > 0:
+                    return # already seen a newer package
+
+                cur.execute("DELETE FROM package WHERE package = ?;",
+                            (package,))
+                cur.execute("DELETE FROM content WHERE package = ?;",
+                            (package,))
+                cur.execute("INSERT INTO package (package, version, architecture) VALUES (?, ?, ?);",
+                            (package, version, architecture))
+                depends = control.relations.get("depends", [])
+                depends = set(dep[0]["name"].encode("ascii")
+                              for dep in depends if len(dep) == 1)
+                break
+            continue
+        elif name == "data.tar.gz":
             tf = tarfile.open(fileobj=af, mode="r|gz")
         elif name == "data.tar.bz2":
             tf = tarfile.open(fileobj=af, mode="r|bz2")
@@ -253,42 +297,20 @@ def get_hashes(filelike):
             tf = tarfile.open(fileobj=zf, mode="r|")
         else:
             continue
-        for elem in tf:
-            if not elem.isreg(): # excludes hard links as well
-                continue
-            hasher = MultiHash(sha512_nontrivial(), gziphash())
-            hasher = hash_file(hasher, tf.extractfile(elem))
-            for hashobj in hasher.hashes:
-                hashvalue = hashobj.hexdigest()
-                if hashvalue:
-                    yield (elem.name, elem.size, hashobj.name, hashvalue)
-    if not tf:
-        raise ValueError("data.tar not found")
+        if state != "control_file":
+            raise ValueError("missing control file")
+        for name, size, function, hexhash in get_hashes(tf):
+            cur.execute("INSERT INTO content (package, filename, size, function, hash) VALUES (?, ?, ?, ?, ?);",
+                        (package, name.decode("utf8"), size, function, hexhash))
+        db.commit()
+        return
+    raise ValueError("data.tar not found")
 
 def main():
-    filename = sys.argv[1]
-    match = re.match("(?:.*/)?(?P<name>[^_]+)_(?P<version>[^_]+)_(?P<architecture>[^_.]+)\\.deb$", filename)
-    package, version, architecture = match.groups()
     db = sqlite3.connect("test.sqlite3")
-    cur = db.cursor()
 
-    cur.execute("SELECT version FROM package WHERE package = ?;", (package,))
-    versions = [tpl[0] for tpl in cur.fetchall()]
-    versions.append(version)
-    versions.sort(cmp=apt_pkg.version_compare)
-    if versions[-1] != version:
-        return # not the newest version
-
-    cur.execute("DELETE FROM package WHERE package = ?;", (package,))
-    cur.execute("DELETE FROM content WHERE package = ?;", (package,))
-    cur.execute("INSERT INTO package (package, version, architecture) VALUES (?, ?, ?);",
-                (package, version, architecture))
-    with open(filename) as pkg:
-        for name, size, function, hexhash in get_hashes(pkg):
-            name = name.decode("utf8")
-            cur.execute("INSERT INTO content (package, filename, size, function, hash) VALUES (?, ?, ?, ?, ?);",
-                    (package, name, size, function, hexhash))
-    db.commit()
+    with open(sys.argv[1]) as pkg:
+        process_package(db, pkg)
 
 if __name__ == "__main__":
     main()
