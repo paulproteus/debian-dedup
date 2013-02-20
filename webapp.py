@@ -5,7 +5,7 @@ from wsgiref.simple_server import make_server
 
 import jinja2
 from werkzeug.exceptions import HTTPException, NotFound
-from werkzeug.routing import Map, Rule
+from werkzeug.routing import Map, Rule, RequestRedirect
 from werkzeug.wrappers import Request, Response
 
 jinjaenv = jinja2.Environment()
@@ -98,6 +98,8 @@ class Application(object):
             elif endpoint == "hash":
                 return self.show_hash(args["function"], args["hashvalue"])
             elif endpoint == "index":
+                if not request.environ["PATH_INFO"]:
+                    raise RequestRedirect(request.environ["SCRIPT_NAME"] + "/")
                 return Response("""<html><head><title>Debian duplication detector</title></head>
 <body><h1>Debian duplication detector</h1>
 <ul>
