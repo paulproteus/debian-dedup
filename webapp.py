@@ -164,11 +164,18 @@ class Application(object):
                         content_type="text/html")
 
     def show_detail(self, package1, package2):
-        details1 = self.get_details(package1)
-        details2 = self.get_details(package2)
+        if package1 == package2:
+            details1 = details2 = self.get_details(package1)
 
-        self.cur.execute("SELECT a.filename, b.filename, a.size, a.function, a.hash FROM content AS a JOIN content AS b ON a.function = b.function AND a.hash = b.hash WHERE a.package = ? AND b.package = ? AND a.filename != b.filename;",
-                        (package1, package2))
+            self.cur.execute("SELECT a.filename, b.filename, a.size, a.function, a.hash FROM content AS a JOIN content AS b ON a.function = b.function AND a.hash = b.hash WHERE a.package = ? AND b.package = ? AND a.filename != b.filename;",
+                             (package1, package1))
+        else:
+            details1 = self.get_details(package1)
+            details2 = self.get_details(package2)
+
+            self.cur.execute("SELECT a.filename, b.filename, a.size, a.function, a.hash FROM content AS a JOIN content AS b ON a.function = b.function AND a.hash = b.hash WHERE a.package = ? AND b.package = ?;",
+                             (package1, package2))
+
         shared = dict()
         for filename1, filename2, size, function, hashvalue in self.cur.fetchall():
             shared.setdefault((filename1, filename2, size), dict())[function] = hashvalue
