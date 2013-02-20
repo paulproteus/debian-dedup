@@ -13,18 +13,16 @@ def main():
     urlbase = sys.argv[1]
     db = sqlite3.connect("test.sqlite3")
     cur = db.cursor()
+    cur.execute("SELECT package, version FROM package;")
+    knownpkgs = dict((row[0], row[1]) for row in cur.fetchall())
 
-    cur.execute("SELECT package, version, architecture FROM package;")
-    knownpkgs = dict((row[0], dict(package=row[0], version=row[1],
-                                   architecture=row[2]))
-                     for row in cur.fetchall())
     pkglist = urllib.urlopen(urlbase + "/dists/sid/main/binary-amd64/Packages.gz").read()
     pkglist = gzip.GzipFile(fileobj=io.BytesIO(pkglist)).read()
-    distpkgs = dict()
+    distpkgs = set()
     for pkg in deb822.Packages.iter_paragraphs(io.BytesIO(pkglist)):
         name = pkg["Package"]
-        distpkgs[name] = pkg
-        if pkg["Version"] == knownpkgs.get(name, dict(version=()))["version"]:
+        distpkgs.add(name)
+        if pkg["Version"] == knownpkgs.get(name, ()):
             continue
         pkgurl = "%s/%s" % (urlbase, pkg["Filename"])
         print("importing %s" % name)
@@ -37,7 +35,7 @@ def main():
     
     cur.execute("PRAGMA foreign_keys=1;")
     cur.executemany("DELETE FROM package WHERE package = ?;",
-                    ((pkg,) for pkg in set(knownpkgs) - set(distpkgs)))
+                    ((pkg,) for pkg in set(knownpkgs) - distpkgs))
     db.commit()
 
 if __name__ == "__main__":
