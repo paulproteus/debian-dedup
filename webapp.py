@@ -8,7 +8,7 @@ from werkzeug.exceptions import HTTPException, NotFound
 from werkzeug.routing import Map, Rule, RequestRedirect
 from werkzeug.wrappers import Request, Response
 
-jinjaenv = jinja2.Environment()
+jinjaenv = jinja2.Environment(loader=jinja2.FileSystemLoader("."))
 
 def format_size(size):
     assert isinstance(size, int)
@@ -27,9 +27,13 @@ def format_size(size):
 
 jinjaenv.filters["format_size"] = format_size
 
+base_template = jinjaenv.get_template("base.html")
+
 package_template = jinjaenv.from_string(
-"""<html><head><title>duplication of {{ package|e }}</title><style type="text/css">.dependency { background-color: yellow; } </style></head>
-<body><h1>{{ package|e }}</h1>
+"""{% extends "base.html" %}
+{% block title %}duplication of {{ package|e }}{% endblock %}
+{% block header %}<style type="text/css">.dependency { background-color: yellow; } </style>{% endblock %}
+{% block content %}<h1>{{ package|e }}</h1>
 <p>Version: {{ version|e }}</p>
 <p>Architecture: {{ architecture|e }}</p>
 <p>Number of files: {{ num_files }}</p>
@@ -48,12 +52,13 @@ package_template = jinjaenv.from_string(
         </table>
     {%- endfor -%}
 {%- endif -%}
-{{ content }}
-</body></html>""")
+{% endblock %}""")
 
 detail_template = jinjaenv.from_string(
-"""<html><head><title>sharing between {{ details1.package|e }} and {{ details2.package|e }}</title></head>
-<body><h1><a href="../../binary/{{ details1.package|e }}">{{ details1.package|e }}</a> &lt;-&gt; <a href="../../binary/{{ details2.package|e }}">{{ details2.package|e }}</a></h1>
+"""{% extends "base.html" %}
+{% block title %}sharing between {{ details1.package|e }} and {{ details2.package|e }}{% endblock%}
+{% block content %}
+<h1><a href="../../binary/{{ details1.package|e }}">{{ details1.package|e }}</a> &lt;-&gt; <a href="../../binary/{{ details2.package|e }}">{{ details2.package|e }}</a></h1>
 {%- if shared -%}
 <table border='1'><tr><th>size</th><th>filename in {{ details1.package|e }}</th><th>filename in {{ details2.package|e }}</th><th>hash functions</th></tr>
     {%- for entry in shared|sort(attribute="size", reverse=true) -%}
@@ -62,18 +67,32 @@ detail_template = jinjaenv.from_string(
     {%- endfor -%}
 </table>
 {%- endif -%}
-</body></html>""")
+{% endblock %}""")
 
 hash_template = jinjaenv.from_string(
-"""<html><head><title>information on {{ function|e }} hash {{ hashvalue|e }}</title></head>
-<body><h1>{{ function|e }} {{ hashvalue|e }}</h1>
+"""{% extends "base.html" %}
+{% block title %}information on {{ function|e }} hash {{ hashvalue|e }}{% endblock %}
+{% block content %}
+<h1>{{ function|e }} {{ hashvalue|e }}</h1>
 <table border='1'><tr><th>package</th><th>filename</th><th>size</th></tr>
 {%- for entry in entries -%}
     <tr><td><a href="../../binary/{{ entry.package|e }}">{{ entry.package|e }}</a></td>
     <td>{{ entry.filename|e }}</td><td>{{ entry.size|format_size }}</td></tr>
 {%- endfor -%}
 </table>
-</body></html>""")
+{% endblock %}""")
+
+index_template = jinjaenv.from_string(
+"""{% extends "base.html" %}
+{% block title %}Debian duplication detector{% endblock %}
+{% block content %}
+<h1>Debian duplication detector</h1>
+<ul>
+<li>To inspect a particlar binary package, go to <pre>binary/&lt;packagename&gt;</pre> Example: <a href="binary/git">binary/git</a></li>
+<li>To inspect a combination of binary packages go to <pre>compare/&lt;firstpackage&gt;/&lt;secondpackage&gt;</pre> Example: <a href="compare/git/git">compare/git/git</a></li>
+<li>To discover package shipping a particular file go to <pre>hash/sha512/&lt;hashvalue&gt;</pre> Example: <a href="hash/sha512/ed94df7781793f06f9426a600c1bde86397afc7b35cb3aa11b60214bd31e35ad893b53a04a2cf4676154982d7c204c4aa165d6ccdaac0170031364a05dbab3bc">hash/sha512/ed94df7781793f06f9426a600c1bde86397afc7b35cb3aa11b60214bd31e35ad893b53a04a2cf4676154982d7c204c4aa165d6ccdaac0170031364a05dbab3bc</a></li>
+<ul>
+{% endblock %}""")
 
 class Application(object):
     def __init__(self):
@@ -100,13 +119,7 @@ class Application(object):
             elif endpoint == "index":
                 if not request.environ["PATH_INFO"]:
                     raise RequestRedirect(request.environ["SCRIPT_NAME"] + "/")
-                return Response("""<html><head><title>Debian duplication detector</title></head>
-<body><h1>Debian duplication detector</h1>
-<ul>
-<li>To inspect a particlar binary package, go to <pre>binary/&lt;packagename&gt;</pre> Example: <a href="binary/git">binary/git</a></li>
-<li>To inspect a combination of binary packages go to <pre>compare/&lt;firstpackage&gt;/&lt;secondpackage&gt;</pre> Example: <a href="compare/git/git">compare/git/git</a></li>
-<li>To discover package shipping a particular file go to <pre>hash/sha512/&lt;hashvalue&gt;</pre> Example: <a href="hash/sha512/ed94df7781793f06f9426a600c1bde86397afc7b35cb3aa11b60214bd31e35ad893b53a04a2cf4676154982d7c204c4aa165d6ccdaac0170031364a05dbab3bc">hash/sha512/ed94df7781793f06f9426a600c1bde86397afc7b35cb3aa11b60214bd31e35ad893b53a04a2cf4676154982d7c204c4aa165d6ccdaac0170031364a05dbab3bc</a></li>
-<ul></body></html>""",
+                return Response(index_template.render().encode("utf8"),
                                 content_type="text/html")
             raise NotFound()
         except HTTPException as e:
