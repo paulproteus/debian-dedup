@@ -18,6 +18,8 @@ from debian.debian_support import version_compare
 from debian import deb822
 import lzma
 
+from dedup.hashing import HashBlacklist, DecompressedHash, SuppressingHash, hash_file
+
 class ArReader(object):
     global_magic = b"!<arch>\n"
     file_magic = b"`\n"
@@ -103,19 +105,6 @@ class MultiHash(object):
         for hasher in self.hashes:
             hasher.update(data)
 
-class HashBlacklist(object):
-    def __init__(self, hasher, blacklist=set()):
-        self.hasher = hasher
-        self.blacklist = blacklist
-        self.update = self.hasher.update
-        self.name = hasher.name
-
-    def hexdigest(self):
-        digest = self.hasher.hexdigest()
-        if digest in self.blacklist:
-            return None
-        return digest
-
 class GzipDecompressor(object):
     def __init__(self):
         self.inbuffer = b""
@@ -174,50 +163,6 @@ class GzipDecompressor(object):
         if self.decompressor:
             new.decompressor = self.decompressor.copy()
         return new
-
-class DecompressedHash(object):
-    def __init__(self, decompressor, hashobj):
-        self.decompressor = decompressor
-        self.hashobj = hashobj
-
-    def update(self, data):
-        self.hashobj.update(self.decompressor.decompress(data))
-
-    def hexdigest(self):
-        if not hasattr(self.decompressor, "flush"):
-            return self.hashobj.hexdigest()
-        tmpdecomp = self.decompressor.copy()
-        data = tmpdecomp.flush()
-        tmphash = self.hashobj.copy()
-        tmphash.update(data)
-        return tmphash.hexdigest()
-
-class SuppressingHash(object):
-    def __init__(self, hashobj, exceptions=()):
-        self.hashobj = hashobj
-        self.exceptions = exceptions
-
-    def update(self, data):
-        if self.hashobj:
-            try:
-                self.hashobj.update(data)
-            except self.exceptions:
-                self.hashobj = None
-
-    def hexdigest(self):
-        if self.hashobj:
-            try:
-                return self.hashobj.hexdigest()
-            except self.exceptions:
-                self.hashobj = None
-        return None
-
-def hash_file(hashobj, filelike, blocksize=65536):
-    data = filelike.read(blocksize)
-    while data:
-        hashobj.update(data)
-        data = filelike.read(blocksize)
-    return hashobj
 
 boring_sha512_hashes = set((
     # ""
