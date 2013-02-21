@@ -27,7 +27,7 @@ def main():
         pkgurl = "%s/%s" % (urlbase, pkg["Filename"])
         print("importing %s" % name)
         dl = subprocess.Popen(["curl", "-s", pkgurl], stdout=subprocess.PIPE)
-        imp = subprocess.Popen("./test.py", stdin=dl.stdout)
+        imp = subprocess.Popen("./importpkg.py", stdin=dl.stdout)
         if dl.wait():
             print("curl failed")
         if imp.wait():
