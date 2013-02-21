@@ -53,7 +53,7 @@ package_template = jinjaenv.from_string(
 
 detail_template = jinjaenv.from_string(
 """<html><head><title>sharing between {{ details1.package|e }} and {{ details2.package|e }}</title></head>
-<body><h1>{{ details1.package|e }} &lt;-&gt; {{ details2.package|e }}</h1>
+<body><h1><a href="../../binary/{{ details1.package|e }}">{{ details1.package|e }}</a> &lt;-&gt; <a href="../../binary/{{ details2.package|e }}">{{ details2.package|e }}</a></h1>
 {%- if shared -%}
 <table border='1'><tr><th>size</th><th>filename in {{ details1.package|e }}</th><th>filename in {{ details2.package|e }}</th><th>hash functions</th></tr>
     {%- for entry in shared|sort(attribute="size", reverse=true) -%}
