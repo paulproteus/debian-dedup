@@ -19,6 +19,7 @@ from debian import deb822
 import lzma
 
 from dedup.hashing import HashBlacklist, DecompressedHash, SuppressingHash, hash_file
+from dedup.compression import GzipDecompressor, DecompressedStream
 
 class ArReader(object):
     global_magic = b"!<arch>\n"
@@ -72,31 +73,6 @@ class ArReader(object):
         self.remaining -= len(data)
         return data
 
-class XzStream(object):
-    blocksize = 65536
-
-    def __init__(self, fileobj):
-        self.fileobj = fileobj
-        self.decomp = lzma.LZMADecompressor()
-        self.buff = b""
-
-    def read(self, length):
-        data = True
-        while True:
-            if len(self.buff) >= length:
-                ret = self.buff[:length]
-                self.buff = self.buff[length:]
-                return ret
-            elif not data: # read EOF in last iteration
-                ret = self.buff
-                self.buff = b""
-                return ret
-            data = self.fileobj.read(self.blocksize)
-            if data:
-                self.buff += self.decomp.decompress(data)
-            else:
-                self.buff += self.decomp.flush()
-
 class MultiHash(object):
     def __init__(self, *hashes):
         self.hashes = hashes
@@ -104,65 +80,6 @@ class MultiHash(object):
     def update(self, data):
         for hasher in self.hashes:
             hasher.update(data)
-
-class GzipDecompressor(object):
-    def __init__(self):
-        self.inbuffer = b""
-        self.decompressor = None # zlib.decompressobj(-zlib.MAX_WBITS)
-
-    def decompress(self, data):
-        if self.decompressor:
-            data = self.decompressor.decompress(data)
-            if not self.decompressor.unused_data:
-                return data
-            unused_data = self.decompressor.unused_data
-            self.decompressor = None
-            return data + self.decompress(unused_data)
-        self.inbuffer += data
-        skip = 10
-        if len(self.inbuffer) < skip:
-            return b""
-        if not self.inbuffer.startswith(b"\037\213\010"):
-            raise ValueError("gzip magic not found")
-        flag = ord(self.inbuffer[3])
-        if flag & 4:
-            if len(self.inbuffer) < skip + 2:
-                return b""
-            length, = struct.unpack("<H", self.inbuffer[skip:skip+2])
-            skip += 2 + length
-        for field in (8, 16):
-            if flag & field:
-                length = self.inbuffer.find("\0", skip)
-                if length < 0:
-                    return b""
-                skip = length + 1
-        if flag & 2:
-            skip += 2
-        if len(self.inbuffer) < skip:
-            return b""
-        data = self.inbuffer[skip:]
-        self.inbuffer = b""
-        self.decompressor = zlib.decompressobj(-zlib.MAX_WBITS)
-        return self.decompress(data)
-
-    @property
-    def unused_data(self):
-        if self.decompressor:
-            return self.decompressor.unused_data
-        else:
-            return self.inbuffer
-
-    def flush(self):
-        if not self.decompressor:
-            return b""
-        return self.decompressor.flush()
-
-    def copy(self):
-        new = GzipDecompressor()
-        new.inbuffer = self.inbuffer
-        if self.decompressor:
-            new.decompressor = self.decompressor.copy()
-        return new
 
 boring_sha512_hashes = set((
     # ""
@@ -243,7 +160,7 @@ def process_package(db, filelike):
         elif name == "data.tar.bz2":
             tf = tarfile.open(fileobj=af, mode="r|bz2")
         elif name == "data.tar.xz":
-            zf = XzStream(af)
+            zf = DecompressedStream(af, lzma.LZMADecompressor())
             tf = tarfile.open(fileobj=zf, mode="r|")
         else:
             continue
