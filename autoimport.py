@@ -8,6 +8,7 @@ import sys
 import urllib
 
 from debian import deb822
+from debian.debian_support import version_compare
 
 def main():
     urlbase = sys.argv[1]
@@ -22,7 +23,7 @@ def main():
     for pkg in deb822.Packages.iter_paragraphs(io.BytesIO(pkglist)):
         name = pkg["Package"]
         distpkgs.add(name)
-        if pkg["Version"] == knownpkgs.get(name, ()):
+        if version_compare(pkg["Version"], knownpkgs.get(name, ())) < 0:
             continue
         pkgurl = "%s/%s" % (urlbase, pkg["Filename"])
         print("importing %s" % name)
