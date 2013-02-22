@@ -101,6 +101,19 @@ def fetchiter(cursor):
             yield row
         rows = cursor.fetchmany()
 
+def encode_and_buffer(iterator):
+    buff = b""
+    for elem in iterator:
+        buff += elem.encode("utf8")
+        if len(buff) >= 2048:
+            yield buff
+            buff = b""
+    if buff:
+        yield buff
+
+def html_response(unicode_iterator):
+    return Response(encode_and_buffer(unicode_iterator), mimetype="text/html")
+
 class Application(object):
     def __init__(self):
         self.db = sqlite3.connect("test.sqlite3")
@@ -126,8 +139,7 @@ class Application(object):
             elif endpoint == "index":
                 if not request.environ["PATH_INFO"]:
                     raise RequestRedirect(request.environ["SCRIPT_NAME"] + "/")
-                return Response(index_template.render().encode("utf8"),
-                                content_type="text/html")
+                return html_response(index_template.stream())
             raise NotFound()
         except HTTPException as e:
             return e
@@ -180,8 +192,7 @@ class Application(object):
                     sharedstats[function].append(dict(package=pkg, duplicate=duplicate, savable=savable))
 
         params["shared"] = sharedstats
-        return Response(package_template.render(**params).encode("utf8"),
-                        content_type="text/html")
+        return html_response(package_template.render(params))
 
     def show_detail(self, package1, package2):
         if package1 == package2:
@@ -206,8 +217,7 @@ class Application(object):
             details1=details1,
             details2=details2,
             shared=shared)
-        return Response(detail_template.render(**params).encode("utf8"),
-                        content_type="text/html")
+        return html_response(detail_template.render(params))
 
     def show_hash(self, function, hashvalue):
         self.cur.execute("SELECT package, filename, size FROM content WHERE function = ? AND hash = ?;",
@@ -217,8 +227,7 @@ class Application(object):
         if not entries:
             raise NotFound()
         params = dict(function=function, hashvalue=hashvalue, entries=entries)
-        return Response(hash_template.render(**params).encode("utf8"),
-                        content_type="text/html")
+        return html_response(hash_template.render(params))
 
 def main():
     app = Application()
