@@ -94,6 +94,13 @@ index_template = jinjaenv.from_string(
 </ul>
 {% endblock %}""")
 
+def fetchiter(cursor):
+    rows = cursor.fetchmany()
+    while rows:
+        for row in rows:
+            yield row
+        rows = cursor.fetchmany()
+
 class Application(object):
     def __init__(self):
         self.db = sqlite3.connect("test.sqlite3")
@@ -144,7 +151,7 @@ class Application(object):
     def get_dependencies(self, package):
         self.cur.execute("SELECT required FROM dependency WHERE package = ?;",
                          (package,))
-        return set(row[0] for row in self.cur.fetchall())
+        return set(row[0] for row in fetchiter(self.cur))
 
     def show_package(self, package):
         params = self.get_details(package)
@@ -153,7 +160,7 @@ class Application(object):
         shared = dict()
         self.cur.execute("SELECT a.filename, a.function, a.hash, a.size, b.package FROM content AS a JOIN content AS b ON a.function = b.function AND a.hash = b.hash WHERE a.package = ? AND (a.filename != b.filename OR b.package != ?);",
                          (package, package))
-        for afile, function, hashval, size, bpkg in self.cur.fetchall():
+        for afile, function, hashval, size, bpkg in fetchiter(self.cur):
             pkgdict = shared.setdefault(function, dict())
             hashdict = pkgdict.setdefault(bpkg, dict())
             fileset = hashdict.setdefault(hashval, (size, set()))[1]
@@ -190,7 +197,7 @@ class Application(object):
                              (package1, package2))
 
         shared = dict()
-        for filename1, filename2, size, function, hashvalue in self.cur.fetchall():
+        for filename1, filename2, size, function, hashvalue in fetchiter(self.cur):
             shared.setdefault((filename1, filename2, size), dict())[function] = hashvalue
         shared = [dict(filename1=filename1, filename2=filename2, size=size,
                        functions=functions)
@@ -206,7 +213,7 @@ class Application(object):
         self.cur.execute("SELECT package, filename, size FROM content WHERE function = ? AND hash = ?;",
                          (function, hashvalue))
         entries = [dict(package=package, filename=filename, size=size)
-                   for package, filename, size in self.cur.fetchall()]
+                   for package, filename, size in fetchiter(self.cur)]
         if not entries:
             raise NotFound()
         params = dict(function=function, hashvalue=hashvalue, entries=entries)
