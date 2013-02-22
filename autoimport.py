@@ -23,7 +23,8 @@ def main():
     for pkg in deb822.Packages.iter_paragraphs(io.BytesIO(pkglist)):
         name = pkg["Package"]
         distpkgs.add(name)
-        if version_compare(pkg["Version"], knownpkgs.get(name, ())) < 0:
+        if name in knownpkgs and \
+                version_compare(pkg["Version"], knownpkgs[name]) <= 0:
             continue
         pkgurl = "%s/%s" % (urlbase, pkg["Filename"])
         print("importing %s" % name)
