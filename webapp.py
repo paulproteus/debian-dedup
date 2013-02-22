@@ -8,6 +8,12 @@ from werkzeug.exceptions import HTTPException, NotFound
 from werkzeug.routing import Map, Rule, RequestRedirect
 from werkzeug.wrappers import Request, Response
 
+hash_functions = [
+        ("sha512", "sha512"),
+        ("gzip_sha512", "gzip_sha512"),
+        ("sha512", "gzip_sha512"),
+        ("gzip_sha512", "sha512")]
+
 jinjaenv = jinja2.Environment(loader=jinja2.FileSystemLoader("."))
 
 def format_size(size):
@@ -40,7 +46,7 @@ package_template = jinjaenv.from_string(
 <p>Total size: {{ total_size|format_size }}</p>
 {%- if shared -%}
     {%- for function, sharing in shared.items() -%}
-        <h3>sharing with respect to {{ function }}</h3>
+        <h3>sharing with respect to {{ function|e }}</h3>
         <table border='1'><tr><th>package</th><th>files shared</th><th>data shared</th></tr>
         {%- for entry in sharing|sort(attribute="savable", reverse=true) -%}
             <tr><td{% if not entry.package or entry.package in dependencies %} class="dependency"{% endif %}>
@@ -63,7 +69,7 @@ detail_template = jinjaenv.from_string(
 <table border='1'><tr><th>size</th><th>filename in {{ details1.package|e }}</th><th>filename in {{ details2.package|e }}</th><th>hash functions</th></tr>
     {%- for entry in shared|sort(attribute="size", reverse=true) -%}
         <tr><td>{{ entry.size|format_size }}</td><td>{{ entry.filename1 }}</td><td>{{ entry.filename2 }}</td><td>
-        {%- for function, hashvalue in entry.functions.items() %}<a href="../../hash/{{ function|e }}/{{ hashvalue|e }}">{{ function|e }}</a> {% endfor %}</td></tr>
+        {%- for function, hashvalue in entry.functions.items() %}<a href="../../hash/{{ function|e|e }}/{{ hashvalue|e }}">{{ function|e }}</a> {% endfor %}</td></tr>
     {%- endfor -%}
 </table>
 {%- endif -%}
@@ -150,27 +156,30 @@ class Application(object):
         params = self.get_details(package)
         params["dependencies"] = self.get_dependencies(package)
 
-        shared = dict()
-        self.cur.execute("SELECT a.filename, a.function, a.hash, a.size, b.package FROM content AS a JOIN content AS b ON a.function = b.function AND a.hash = b.hash WHERE a.package = ? AND (a.filename != b.filename OR b.package != ?);",
-                         (package, package))
-        for afile, function, hashval, size, bpkg in self.cur.fetchall():
-            pkgdict = shared.setdefault(function, dict())
-            hashdict = pkgdict.setdefault(bpkg, dict())
-            fileset = hashdict.setdefault(hashval, (size, set()))[1]
-            fileset.add(afile)
         sharedstats = {}
-        if shared:
-            for function, sharing in shared.items():
-                sharedstats[function] = list()
+        for func1, func2 in hash_functions:
+            self.cur.execute("SELECT a.filename, a.hash, a.size, b.package FROM content AS a JOIN content AS b ON a.hash = b.hash WHERE a.package = ? AND a.function = ? AND b.function = ? AND (a.filename != b.filename OR b.package != ?);",
+                             (package, func1, func2, package))
+            sharing = dict()
+            for afile, hashval, size, bpkg in self.cur.fetchall():
+                hashdict = sharing.setdefault(bpkg, dict())
+                fileset = hashdict.setdefault(hashval, (size, set()))[1]
+                fileset.add(afile)
+            if sharing:
+                curstats = list()
+                if func1 == func2:
+                    sharedstats[func1] = curstats
+                else:
+                    sharedstats["%s -> %s" % (func1, func2)] = curstats
                 mapping = sharing.pop(package, dict())
                 if mapping:
                     duplicate = sum(len(files) for _, files in mapping.values())
                     savable = sum(size * (len(files) - 1) for size, files in mapping.values())
-                    sharedstats[function].append(dict(package=None, duplicate=duplicate, savable=savable))
+                    curstats.append(dict(package=None, duplicate=duplicate, savable=savable))
                 for pkg, mapping in sharing.items():
                     duplicate = sum(len(files) for _, files in mapping.values())
                     savable = sum(size * len(files) for size, files in mapping.values())
-                    sharedstats[function].append(dict(package=pkg, duplicate=duplicate, savable=savable))
+                    curstats.append(dict(package=pkg, duplicate=duplicate, savable=savable))
 
         params["shared"] = sharedstats
         return Response(package_template.render(**params).encode("utf8"),
