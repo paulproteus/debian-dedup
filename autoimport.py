@@ -28,10 +28,10 @@ def main():
         print("importing %s" % name)
         dl = subprocess.Popen(["curl", "-s", pkgurl], stdout=subprocess.PIPE)
         imp = subprocess.Popen("./importpkg.py", stdin=dl.stdout)
-        if dl.wait():
-            print("curl failed")
         if imp.wait():
             print("import failed")
+        if dl.wait():
+            print("curl failed")
     
     cur.execute("PRAGMA foreign_keys=1;")
     cur.executemany("DELETE FROM package WHERE package = ?;",
