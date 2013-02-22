@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+import datetime
 import sqlite3
 from wsgiref.simple_server import make_server
 
@@ -111,8 +112,11 @@ def encode_and_buffer(iterator):
     if buff:
         yield buff
 
-def html_response(unicode_iterator):
-    return Response(encode_and_buffer(unicode_iterator), mimetype="text/html")
+def html_response(unicode_iterator, max_age=24 * 60 * 60):
+    resp = Response(encode_and_buffer(unicode_iterator), mimetype="text/html")
+    resp.cache_control.max_age = max_age
+    resp.expires = datetime.datetime.now() + datetime.timedelta(seconds=max_age)
+    return resp
 
 class Application(object):
     def __init__(self):
