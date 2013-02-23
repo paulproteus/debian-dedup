@@ -35,9 +35,11 @@ def main():
         if dl.wait():
             print("curl failed")
     
+    delpkgs = set(knownpkgs) - distpkgs
+    print("clearing packages %s" % " ".join(delpkgs))
     cur.execute("PRAGMA foreign_keys=1;")
     cur.executemany("DELETE FROM package WHERE package = ?;",
-                    ((pkg,) for pkg in set(knownpkgs) - distpkgs))
+                    ((pkg,) for pkg in delpkgs))
     db.commit()
 
 if __name__ == "__main__":
