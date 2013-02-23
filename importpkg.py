@@ -167,8 +167,13 @@ def process_package(db, filelike):
         if state != "control_file":
             raise ValueError("missing control file")
         for name, size, function, hexhash in get_hashes(tf):
+            try:
+                name = name.decode("utf8")
+            except UnicodeDecodeError:
+                print("warning: skipping filename with encoding error")
+                continue # skip files with non-utf8 encoding for now
             cur.execute("INSERT INTO content (package, filename, size, function, hash) VALUES (?, ?, ?, ?, ?);",
-                        (package, name.decode("utf8"), size, function, hexhash))
+                        (package, name, size, function, hexhash))
         db.commit()
         return
     raise ValueError("data.tar not found")
