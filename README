@@ -12,7 +12,7 @@ Import packages
 ---------------
 Import individual packages by feeding them to importpkg.py:
 
-    ls -t /var/cache/apt/archives/*.deb | while read f; echo $f; ./importpkg.py < $f || break; done
+    ls -t /var/cache/apt/archives/*.deb | while read f; do echo $f; ./importpkg.py < $f || break; done
 
 Import a full mirror::
 
