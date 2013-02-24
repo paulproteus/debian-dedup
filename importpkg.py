@@ -20,6 +20,7 @@ import lzma
 
 from dedup.hashing import HashBlacklist, DecompressedHash, SuppressingHash, hash_file
 from dedup.compression import GzipDecompressor, DecompressedStream
+from dedup.image import ImageHash
 
 class ArReader(object):
     global_magic = b"!<arch>\n"
@@ -96,11 +97,17 @@ def gziphash():
     hashobj.name = "gzip_sha512"
     return HashBlacklist(hashobj, boring_sha512_hashes)
 
+def imagehash():
+    hashobj = ImageHash(hashlib.sha512())
+    hashobj = SuppressingHash(hashobj, (ValueError,))
+    hashobj.name = "image_sha512"
+    return hashobj
+
 def get_hashes(tar):
     for elem in tar:
         if not elem.isreg(): # excludes hard links as well
             continue
-        hasher = MultiHash(sha512_nontrivial(), gziphash())
+        hasher = MultiHash(sha512_nontrivial(), gziphash(), imagehash())
         hasher = hash_file(hasher, tar.extractfile(elem))
         for hashobj in hasher.hashes:
             hashvalue = hashobj.hexdigest()

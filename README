@@ -1,7 +1,7 @@
 Required packages
 -----------------
 
-aptitude install python python-debian python-lzma curl python-jinja2 python-werkzeug sqlite3
+aptitude install python python-debian python-lzma curl python-jinja2 python-werkzeug sqlite3 python-imaging
 
 Create a database
 -----------------
