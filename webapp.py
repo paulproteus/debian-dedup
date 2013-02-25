@@ -9,6 +9,13 @@ from werkzeug.exceptions import HTTPException, NotFound
 from werkzeug.routing import Map, Rule, RequestRedirect
 from werkzeug.wrappers import Request, Response
 
+hash_functions = [
+        ("sha512", "sha512"),
+        ("image_sha512", "image_sha512"),
+        ("gzip_sha512", "gzip_sha512"),
+        ("sha512", "gzip_sha512"),
+        ("gzip_sha512", "sha512")]
+
 jinjaenv = jinja2.Environment(loader=jinja2.FileSystemLoader("."))
 
 def format_size(size):
@@ -41,7 +48,7 @@ package_template = jinjaenv.from_string(
 <p>Total size: {{ total_size|format_size }}</p>
 {%- if shared -%}
     {%- for function, sharing in shared.items() -%}
-        <h3>sharing with respect to {{ function }}</h3>
+        <h3>sharing with respect to {{ function|e }}</h3>
         <table border='1'><tr><th>package</th><th>files shared</th><th>data shared</th></tr>
         {%- for entry in sharing|sort(attribute="savable", reverse=true) -%}
             <tr><td{% if not entry.package or entry.package in dependencies %} class="dependency"{% endif %}>
@@ -61,10 +68,13 @@ detail_template = jinjaenv.from_string(
 {% block content %}
 <h1><a href="../../binary/{{ details1.package|e }}">{{ details1.package|e }}</a> &lt;-&gt; <a href="../../binary/{{ details2.package|e }}">{{ details2.package|e }}</a></h1>
 {%- if shared -%}
-<table border='1'><tr><th>size</th><th>filename in {{ details1.package|e }}</th><th>filename in {{ details2.package|e }}</th><th>hash functions</th></tr>
-    {%- for entry in shared|sort(attribute="size", reverse=true) -%}
-        <tr><td>{{ entry.size|format_size }}</td><td>{{ entry.filename1 }}</td><td>{{ entry.filename2 }}</td><td>
-        {%- for function, hashvalue in entry.functions.items() %}<a href="../../hash/{{ function|e }}/{{ hashvalue|e }}">{{ function|e }}</a> {% endfor %}</td></tr>
+<table border='1'><tr><th colspan="3">{{ details1.package|e }}</th><th colspan="3">{{ details2.package|e }}</th></tr>
+<tr><th>size</th><th>filename</th><th>hash functions</th><th>size</th><th>filename</th><th>hash functions</th></tr>
+    {%- for entry in shared|sort(attribute="size1", reverse=true) -%}
+        <tr><td>{{ entry.size1|format_size }}</td><td>{{ entry.filename1 }}</td><td>
+            {%- for funccomb, hashvalue in entry.functions.items() %}<a href="../../hash/{{ funccomb[0]|e }}/{{ hashvalue|e }}">{{ funccomb[0]|e }}</a> {% endfor %}</td>
+        <td>{{ entry.size2|format_size }}</td><td>{{ entry.filename2 }}</td><td>
+            {%- for funccomb, hashvalue in entry.functions.items() %}<a href="../../hash/{{ funccomb[1]|e }}/{{ hashvalue|e }}">{{ funccomb[1]|e }}</a> {% endfor %}</td></tr>
     {%- endfor -%}
 </table>
 {%- endif -%}
@@ -75,10 +85,11 @@ hash_template = jinjaenv.from_string(
 {% block title %}information on {{ function|e }} hash {{ hashvalue|e }}{% endblock %}
 {% block content %}
 <h1>{{ function|e }} {{ hashvalue|e }}</h1>
-<table border='1'><tr><th>package</th><th>filename</th><th>size</th></tr>
+<table border='1'><tr><th>package</th><th>filename</th><th>size</th><th>different function</th></tr>
 {%- for entry in entries -%}
     <tr><td><a href="../../binary/{{ entry.package|e }}">{{ entry.package|e }}</a></td>
-    <td>{{ entry.filename|e }}</td><td>{{ entry.size|format_size }}</td></tr>
+    <td>{{ entry.filename|e }}</td><td>{{ entry.size|format_size }}</td>
+    <td>{% if function != entry.function %}{{ entry.function|e }}{% endif %}</td></tr>
 {%- endfor -%}
 </table>
 {% endblock %}""")
@@ -173,27 +184,30 @@ class Application(object):
         params = self.get_details(package)
         params["dependencies"] = self.get_dependencies(package)
 
-        shared = dict()
-        self.cur.execute("SELECT a.filename, a.function, a.hash, a.size, b.package FROM content AS a JOIN content AS b ON a.function = b.function AND a.hash = b.hash WHERE a.package = ? AND (a.filename != b.filename OR b.package != ?);",
-                         (package, package))
-        for afile, function, hashval, size, bpkg in fetchiter(self.cur):
-            pkgdict = shared.setdefault(function, dict())
-            hashdict = pkgdict.setdefault(bpkg, dict())
-            fileset = hashdict.setdefault(hashval, (size, set()))[1]
-            fileset.add(afile)
         sharedstats = {}
-        if shared:
-            for function, sharing in shared.items():
-                sharedstats[function] = list()
+        for func1, func2 in hash_functions:
+            self.cur.execute("SELECT a.filename, a.hash, a.size, b.package FROM content AS a JOIN content AS b ON a.hash = b.hash WHERE a.package = ? AND a.function = ? AND b.function = ? AND (a.filename != b.filename OR b.package != ?);",
+                             (package, func1, func2, package))
+            sharing = dict()
+            for afile, hashval, size, bpkg in fetchiter(self.cur):
+                hashdict = sharing.setdefault(bpkg, dict())
+                fileset = hashdict.setdefault(hashval, (size, set()))[1]
+                fileset.add(afile)
+            if sharing:
+                curstats = list()
+                if func1 == func2:
+                    sharedstats[func1] = curstats
+                else:
+                    sharedstats["%s -> %s" % (func1, func2)] = curstats
                 mapping = sharing.pop(package, dict())
                 if mapping:
                     duplicate = sum(len(files) for _, files in mapping.values())
                     savable = sum(size * (len(files) - 1) for size, files in mapping.values())
-                    sharedstats[function].append(dict(package=None, duplicate=duplicate, savable=savable))
+                    curstats.append(dict(package=None, duplicate=duplicate, savable=savable))
                 for pkg, mapping in sharing.items():
                     duplicate = sum(len(files) for _, files in mapping.values())
                     savable = sum(size * len(files) for size, files in mapping.values())
-                    sharedstats[function].append(dict(package=pkg, duplicate=duplicate, savable=savable))
+                    curstats.append(dict(package=pkg, duplicate=duplicate, savable=savable))
 
         params["shared"] = sharedstats
         return html_response(package_template.render(params))
@@ -202,21 +216,27 @@ class Application(object):
         if package1 == package2:
             details1 = details2 = self.get_details(package1)
 
-            self.cur.execute("SELECT a.filename, b.filename, a.size, a.function, a.hash FROM content AS a JOIN content AS b ON a.function = b.function AND a.hash = b.hash WHERE a.package = ? AND b.package = ? AND a.filename != b.filename;",
+            self.cur.execute("SELECT a.filename, a.size, a.function, b.filename, b.size, b.function, a.hash FROM content AS a JOIN content AS b ON a.hash = b.hash WHERE a.package = ? AND b.package = ? AND a.filename != b.filename;",
                              (package1, package1))
         else:
             details1 = self.get_details(package1)
             details2 = self.get_details(package2)
 
-            self.cur.execute("SELECT a.filename, b.filename, a.size, a.function, a.hash FROM content AS a JOIN content AS b ON a.function = b.function AND a.hash = b.hash WHERE a.package = ? AND b.package = ?;",
+            self.cur.execute("SELECT a.filename, a.size, a.function, b.filename, b.size, b.function, a.hash FROM content AS a JOIN content AS b ON a.hash = b.hash WHERE a.package = ? AND b.package = ?;",
                              (package1, package2))
 
         shared = dict()
-        for filename1, filename2, size, function, hashvalue in fetchiter(self.cur):
-            shared.setdefault((filename1, filename2, size), dict())[function] = hashvalue
-        shared = [dict(filename1=filename1, filename2=filename2, size=size,
-                       functions=functions)
-                  for (filename1, filename2, size), functions in shared.items()]
+        for filename1, size1, func1, filename2, size2, func2, hashvalue in fetchiter(self.cur):
+            funccomb = (func1, func2)
+            if funccomb not in hash_functions:
+                continue
+            funcdict = shared.setdefault((filename1, filename2),
+                                         (size1, size2, dict()))[2]
+            funcdict[(func1, func2)] = hashvalue
+        shared = [dict(filename1=filename1, filename2=filename2, size1=size1,
+                       size2=size2, functions=functions)
+                  for (filename1, filename2), (size1, size2, functions)
+                  in shared.items()]
         params = dict(
             details1=details1,
             details2=details2,
@@ -224,10 +244,12 @@ class Application(object):
         return html_response(detail_template.render(params))
 
     def show_hash(self, function, hashvalue):
-        self.cur.execute("SELECT package, filename, size FROM content WHERE function = ? AND hash = ?;",
-                         (function, hashvalue))
-        entries = [dict(package=package, filename=filename, size=size)
-                   for package, filename, size in fetchiter(self.cur)]
+        self.cur.execute("SELECT package, filename, size, function FROM content WHERE hash = ?;",
+                         (hashvalue,))
+        entries = [dict(package=package, filename=filename, size=size,
+                        function=otherfunc)
+                   for package, filename, size, otherfunc in fetchiter(self.cur)
+                   if (function, otherfunc) in hash_functions]
         if not entries:
             raise NotFound()
         params = dict(function=function, hashvalue=hashvalue, entries=entries)
