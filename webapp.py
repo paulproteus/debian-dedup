@@ -132,7 +132,6 @@ def html_response(unicode_iterator, max_age=24 * 60 * 60):
 class Application(object):
     def __init__(self, db):
         self.db = db
-        self.cur = self.db.cursor()
         self.routingmap = Map([
             Rule("/", methods=("GET",), endpoint="index"),
             Rule("/binary/<package>", methods=("GET",), endpoint="package"),
@@ -160,36 +159,39 @@ class Application(object):
             return e
 
     def get_details(self, package):
-        self.cur.execute("SELECT version, architecture FROM package WHERE package = ?;",
-                         (package,))
-        row = self.cur.fetchone()
+        cur = self.db.cursor()
+        cur.execute("SELECT version, architecture FROM package WHERE package = ?;",
+                    (package,))
+        row = cur.fetchone()
         if not row:
             raise NotFound()
         version, architecture = row
         details = dict(package=package,
                        version=version,
                        architecture=architecture)
-        self.cur.execute("SELECT count(filename), sum(size) FROM content WHERE package = ?;",
-                         (package,))
-        num_files, total_size = self.cur.fetchone()
+        cur.execute("SELECT count(filename), sum(size) FROM content WHERE package = ?;",
+                    (package,))
+        num_files, total_size = cur.fetchone()
         details.update(dict(num_files=num_files, total_size=total_size))
         return details
 
     def get_dependencies(self, package):
-        self.cur.execute("SELECT required FROM dependency WHERE package = ?;",
-                         (package,))
-        return set(row[0] for row in fetchiter(self.cur))
+        cur = self.db.cursor()
+        cur.execute("SELECT required FROM dependency WHERE package = ?;",
+                    (package,))
+        return set(row[0] for row in fetchiter(cur))
 
     def show_package(self, package):
+        cur = self.db.cursor()
         params = self.get_details(package)
         params["dependencies"] = self.get_dependencies(package)
 
         sharedstats = {}
         for func1, func2 in hash_functions:
-            self.cur.execute("SELECT a.filename, a.hash, a.size, b.package FROM content AS a JOIN content AS b ON a.hash = b.hash WHERE a.package = ? AND a.function = ? AND b.function = ? AND (a.filename != b.filename OR b.package != ?);",
-                             (package, func1, func2, package))
+            cur.execute("SELECT a.filename, a.hash, a.size, b.package FROM content AS a JOIN content AS b ON a.hash = b.hash WHERE a.package = ? AND a.function = ? AND b.function = ? AND (a.filename != b.filename OR b.package != ?);",
+                        (package, func1, func2, package))
             sharing = dict()
-            for afile, hashval, size, bpkg in fetchiter(self.cur):
+            for afile, hashval, size, bpkg in fetchiter(cur):
                 hashdict = sharing.setdefault(bpkg, dict())
                 fileset = hashdict.setdefault(hashval, (size, set()))[1]
                 fileset.add(afile)
@@ -213,20 +215,21 @@ class Application(object):
         return html_response(package_template.render(params))
 
     def show_detail(self, package1, package2):
+        cur = self.db.cursor()
         if package1 == package2:
             details1 = details2 = self.get_details(package1)
 
-            self.cur.execute("SELECT a.filename, a.size, a.function, b.filename, b.size, b.function, a.hash FROM content AS a JOIN content AS b ON a.hash = b.hash WHERE a.package = ? AND b.package = ? AND a.filename != b.filename;",
-                             (package1, package1))
+            cur.execute("SELECT a.filename, a.size, a.function, b.filename, b.size, b.function, a.hash FROM content AS a JOIN content AS b ON a.hash = b.hash WHERE a.package = ? AND b.package = ? AND a.filename != b.filename;",
+                        (package1, package1))
         else:
             details1 = self.get_details(package1)
             details2 = self.get_details(package2)
 
-            self.cur.execute("SELECT a.filename, a.size, a.function, b.filename, b.size, b.function, a.hash FROM content AS a JOIN content AS b ON a.hash = b.hash WHERE a.package = ? AND b.package = ?;",
-                             (package1, package2))
+            cur.execute("SELECT a.filename, a.size, a.function, b.filename, b.size, b.function, a.hash FROM content AS a JOIN content AS b ON a.hash = b.hash WHERE a.package = ? AND b.package = ?;",
+                        (package1, package2))
 
         shared = dict()
-        for filename1, size1, func1, filename2, size2, func2, hashvalue in fetchiter(self.cur):
+        for filename1, size1, func1, filename2, size2, func2, hashvalue in fetchiter(cur):
             funccomb = (func1, func2)
             if funccomb not in hash_functions:
                 continue
@@ -244,11 +247,12 @@ class Application(object):
         return html_response(detail_template.render(params))
 
     def show_hash(self, function, hashvalue):
-        self.cur.execute("SELECT package, filename, size, function FROM content WHERE hash = ?;",
-                         (hashvalue,))
+        cur = self.db.cursor()
+        cur.execute("SELECT package, filename, size, function FROM content WHERE hash = ?;",
+                    (hashvalue,))
         entries = [dict(package=package, filename=filename, size=size,
                         function=otherfunc)
-                   for package, filename, size, otherfunc in fetchiter(self.cur)
+                   for package, filename, size, otherfunc in fetchiter(cur)
                    if (function, otherfunc) in hash_functions]
         if not entries:
             raise NotFound()
