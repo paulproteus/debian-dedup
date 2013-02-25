@@ -38,6 +38,10 @@ def main():
     delpkgs = set(knownpkgs) - distpkgs
     print("clearing packages %s" % " ".join(delpkgs))
     cur.execute("PRAGMA foreign_keys=1;")
+    cur.executemany("DELETE FROM content WHERE package = ?;",
+                    ((pkg,) for pkg in delpkgs))
+    cur.executemany("DELETE FROM dependency WHERE package = ?;",
+                    ((pkg,) for pkg in delpkgs))
     cur.executemany("DELETE FROM package WHERE package = ?;",
                     ((pkg,) for pkg in delpkgs))
     db.commit()
