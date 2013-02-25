@@ -130,8 +130,8 @@ def html_response(unicode_iterator, max_age=24 * 60 * 60):
     return resp
 
 class Application(object):
-    def __init__(self):
-        self.db = sqlite3.connect("test.sqlite3")
+    def __init__(self, db):
+        self.db = db
         self.cur = self.db.cursor()
         self.routingmap = Map([
             Rule("/", methods=("GET",), endpoint="index"),
@@ -256,7 +256,7 @@ class Application(object):
         return html_response(hash_template.render(params))
 
 def main():
-    app = Application()
+    app = Application(sqlite3.connect("test.sqlite3"))
     #app = DebuggedApplication(app, evalex=True)
     make_server("0.0.0.0", 8800, app).serve_forever()
 
