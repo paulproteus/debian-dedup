@@ -6,7 +6,12 @@ aptitude install python python-debian python-lzma curl python-jinja2 python-werk
 Create a database
 -----------------
 The database name is currently hardcoded as `test.sqlite3`. So copy the SQL
-statements from `importpkg.py` into `sqlite3 test.sqlite3`.
+statements from `schema.sql` into `sqlite3 test.sqlite3`. In addition it is
+highly recommended to put the database into WAL mode. Otherwise all your
+reading queries will block forever when doing an import. This setting is
+permanent.
+
+    PRAGMA journal_mode = WAL;
 
 Import packages
 ---------------
