@@ -97,10 +97,44 @@ hash_template = jinjaenv.from_string(
 index_template = jinjaenv.from_string(
 """{% extends "base.html" %}
 {% block title %}Debian duplication detector{% endblock %}
+{% block header %}
+    <script type="text/javascript">
+        function getLinkTarget() {
+            var pkg = document.getElementById("pkg_name").value;
+            if(pkg) {
+                return "/binary/"+pkg;
+            }
+            return '#';
+        }
+        function processData() {
+            var link = document.getElementById("perma_link");
+            link.href = getLinkTarget();
+            link.text = location.href + getLinkTarget();
+        }
+        window.onload = function() {
+            document.getElementById('pkg_name').onkeyup = processData;
+            document.getElementById("pkg_form").onsubmit = function () {
+                location.href = getLinkTarget();
+                return false;
+            }
+            processData();
+            document.getElementById("form_div").style.display = '';
+        }
+    </script>
+{% endblock %}
 {% block content %}
 <h1>Debian duplication detector</h1>
 <ul>
-<li>To inspect a particlar binary package, go to <pre>binary/&lt;packagename&gt;</pre> Example: <a href="binary/git">binary/git</a></li>
+<li>To inspect a particlar binary package, go to <pre>binary/&lt;packagename&gt;</pre> Example: <a href="binary/git">binary/git</a>
+    <div style="display:none" id="form_div"><fieldset>
+            <legend>Inspect package</legend>
+            <noscript><b>This form is disfunctional when javascript is not enabled</b></noscript>
+            Enter binary package to inspect - Note: Non-existing packages will result in <b>404</b>-Errors
+            <form id="pkg_form">
+                <label for="pkg_name">Name: <input type="text" size="30" name="pkg_name" id="pkg_name">
+                <input type="submit" value="Go"> Permanent Link: <a id="perma_link" href="#" />
+            </form>
+    </fieldset></div></li>
 <li>To inspect a combination of binary packages go to <pre>compare/&lt;firstpackage&gt;/&lt;secondpackage&gt;</pre> Example: <a href="compare/git/git">compare/git/git</a></li>
 <li>To discover package shipping a particular file go to <pre>hash/sha512/&lt;hashvalue&gt;</pre> Example: <a href="hash/sha512/ed94df7781793f06f9426a600c1bde86397afc7b35cb3aa11b60214bd31e35ad893b53a04a2cf4676154982d7c204c4aa165d6ccdaac0170031364a05dbab3bc">hash/sha512/ed94df7781793f06f9426a600c1bde86397afc7b35cb3aa11b60214bd31e35ad893b53a04a2cf4676154982d7c204c4aa165d6ccdaac0170031364a05dbab3bc</a></li>
 </ul>
