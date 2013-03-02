@@ -38,7 +38,7 @@ def process_pkgdict(cursor, pkgdict):
                     add_values(cursor, insert_key, pkgnumfiles, pkgsize)
 
 def main():
-    db = sqlite3.connect("big.sqlite3")
+    db = sqlite3.connect("test.sqlite3")
     cur = db.cursor()
     cur.execute("DELETE FROM sharing;")
     readcur = db.cursor()
