@@ -9,6 +9,8 @@ from werkzeug.exceptions import HTTPException, NotFound
 from werkzeug.routing import Map, Rule, RequestRedirect
 from werkzeug.wrappers import Request, Response
 
+from dedup.utils import fetchiter
+
 hash_functions = [
         ("sha512", "sha512"),
         ("image_sha512", "image_sha512"),
@@ -139,13 +141,6 @@ index_template = jinjaenv.from_string(
 <li>To discover package shipping a particular file go to <pre>hash/sha512/&lt;hashvalue&gt;</pre> Example: <a href="hash/sha512/ed94df7781793f06f9426a600c1bde86397afc7b35cb3aa11b60214bd31e35ad893b53a04a2cf4676154982d7c204c4aa165d6ccdaac0170031364a05dbab3bc">hash/sha512/ed94df7781793f06f9426a600c1bde86397afc7b35cb3aa11b60214bd31e35ad893b53a04a2cf4676154982d7c204c4aa165d6ccdaac0170031364a05dbab3bc</a></li>
 </ul>
 {% endblock %}""")
-
-def fetchiter(cursor):
-    rows = cursor.fetchmany()
-    while rows:
-        for row in rows:
-            yield row
-        rows = cursor.fetchmany()
 
 def encode_and_buffer(iterator):
     buff = b""
