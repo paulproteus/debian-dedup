@@ -132,7 +132,7 @@ index_template = jinjaenv.from_string(
             Enter binary package to inspect - Note: Non-existing packages will result in <b>404</b>-Errors
             <form id="pkg_form">
                 <label for="pkg_name">Name: <input type="text" size="30" name="pkg_name" id="pkg_name">
-                <input type="submit" value="Go"> Permanent Link: <a id="perma_link" href="#" />
+                <input type="submit" value="Go"> Permanent Link: <a id="perma_link" href="#"></a>
             </form>
     </fieldset></div></li>
 <li>To inspect a combination of binary packages go to <pre>compare/&lt;firstpackage&gt;/&lt;secondpackage&gt;</pre> Example: <a href="compare/git/git">compare/git/git</a></li>
