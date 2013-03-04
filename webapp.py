@@ -69,17 +69,15 @@ detail_template = jinjaenv.from_string(
 {% block title %}sharing between {{ details1.package|e }} and {{ details2.package|e }}{% endblock%}
 {% block content %}
 <h1><a href="../../binary/{{ details1.package|e }}">{{ details1.package|e }}</a> &lt;-&gt; <a href="../../binary/{{ details2.package|e }}">{{ details2.package|e }}</a></h1>
-{%- if shared -%}
 <table border='1'><tr><th colspan="3">{{ details1.package|e }}</th><th colspan="3">{{ details2.package|e }}</th></tr>
 <tr><th>size</th><th>filename</th><th>hash functions</th><th>size</th><th>filename</th><th>hash functions</th></tr>
-    {%- for entry in shared|sort(attribute="size1", reverse=true) -%}
+    {%- for entry in shared -%}
         <tr><td>{{ entry.size1|format_size }}</td><td>{{ entry.filename1 }}</td><td>
             {%- for funccomb, hashvalue in entry.functions.items() %}<a href="../../hash/{{ funccomb[0]|e }}/{{ hashvalue|e }}">{{ funccomb[0]|e }}</a> {% endfor %}</td>
         <td>{{ entry.size2|format_size }}</td><td>{{ entry.filename2 }}</td><td>
             {%- for funccomb, hashvalue in entry.functions.items() %}<a href="../../hash/{{ funccomb[1]|e }}/{{ hashvalue|e }}">{{ funccomb[1]|e }}</a> {% endfor %}</td></tr>
     {%- endfor -%}
 </table>
-{%- endif -%}
 {% endblock %}""")
 
 hash_template = jinjaenv.from_string(
@@ -157,6 +155,27 @@ def html_response(unicode_iterator, max_age=24 * 60 * 60):
     resp.cache_control.max_age = max_age
     resp.expires = datetime.datetime.now() + datetime.timedelta(seconds=max_age)
     return resp
+
+def generate_shared(rows):
+    """internal helper from show_detail"""
+    entry = None
+    for filename1, size1, func1, filename2, size2, func2, hashvalue in rows:
+        funccomb = (func1, func2)
+        if funccomb not in hash_functions:
+            continue
+        if entry and (entry["filename1"] != filename1 or
+                      entry["filename2"] != filename2):
+            yield entry
+            entry = None
+        if entry:
+            funcdict = entry["functions"]
+        else:
+            funcdict = dict()
+            entry = dict(filename1=filename1, filename2=filename2, size1=size1,
+                         size2=size2, functions=funcdict)
+        funcdict[funccomb] = hashvalue
+    if entry:
+        yield entry
 
 class Application(object):
     def __init__(self, db):
@@ -248,32 +267,21 @@ class Application(object):
         if package1 == package2:
             details1 = details2 = self.get_details(package1)
 
-            cur.execute("SELECT a.filename, a.size, a.function, b.filename, b.size, b.function, a.hash FROM content AS a JOIN content AS b ON a.hash = b.hash WHERE a.package = ? AND b.package = ? AND a.filename != b.filename;",
+            cur.execute("SELECT a.filename, a.size, a.function, b.filename, b.size, b.function, a.hash FROM content AS a JOIN content AS b ON a.hash = b.hash WHERE a.package = ? AND b.package = ? AND a.filename != b.filename ORDER BY a.size DESC, a.filename, b.filename;",
                         (package1, package1))
         else:
             details1 = self.get_details(package1)
             details2 = self.get_details(package2)
 
-            cur.execute("SELECT a.filename, a.size, a.function, b.filename, b.size, b.function, a.hash FROM content AS a JOIN content AS b ON a.hash = b.hash WHERE a.package = ? AND b.package = ?;",
+            cur.execute("SELECT a.filename, a.size, a.function, b.filename, b.size, b.function, a.hash FROM content AS a JOIN content AS b ON a.hash = b.hash WHERE a.package = ? AND b.package = ? ORDER BY a.size DESC, a.filename, b.filename;",
                         (package1, package2))
-
-        shared = dict()
-        for filename1, size1, func1, filename2, size2, func2, hashvalue in fetchiter(cur):
-            funccomb = (func1, func2)
-            if funccomb not in hash_functions:
-                continue
-            funcdict = shared.setdefault((filename1, filename2),
-                                         (size1, size2, dict()))[2]
-            funcdict[(func1, func2)] = hashvalue
-        shared = [dict(filename1=filename1, filename2=filename2, size1=size1,
-                       size2=size2, functions=functions)
-                  for (filename1, filename2), (size1, size2, functions)
-                  in shared.items()]
+        shared = generate_shared(fetchiter(cur))
+        # The cursor will be in use until the template is fully rendered.
         params = dict(
             details1=details1,
             details2=details2,
             shared=shared)
-        return html_response(detail_template.render(params))
+        return html_response(detail_template.stream(params))
 
     def show_hash(self, function, hashvalue):
         cur = self.db.cursor()
