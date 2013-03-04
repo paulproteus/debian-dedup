@@ -131,6 +131,10 @@ def process_package(db, filelike):
                 control = tf.extractfile(elem).read()
                 control = deb822.Packages(control)
                 package = control["package"].encode("ascii")
+                try:
+                    source = control["source"].encode("ascii")
+                except KeyError:
+                    source = package
                 version = control["version"].encode("ascii")
                 architecture = control["architecture"].encode("ascii")
 
@@ -153,6 +157,10 @@ def process_package(db, filelike):
                             (package,))
                 cur.executemany("INSERT INTO dependency (package, required) VALUES (?, ?);",
                                 ((package, dep) for dep in depends))
+                cur.execute("DELETE FROM source WHERE package = ?;",
+                            (package,))
+                cur.execute("INSERT INTO source (source, package) VALUES (?, ?);",
+                            (source, package))
                 break
             continue
         elif name == "data.tar.gz":
