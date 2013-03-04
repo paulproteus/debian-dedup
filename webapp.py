@@ -229,11 +229,8 @@ class Application(object):
                     (package,))
         return set(row[0] for row in fetchiter(cur))
 
-    def show_package(self, package):
+    def compute_sharedstats(self, package):
         cur = self.db.cursor()
-        params = self.get_details(package)
-        params["dependencies"] = self.get_dependencies(package)
-
         sharedstats = {}
         for func1, func2 in hash_functions:
             cur.execute("SELECT a.filename, a.hash, a.size, b.package FROM content AS a JOIN content AS b ON a.hash = b.hash WHERE a.package = ? AND a.function = ? AND b.function = ? AND (a.filename != b.filename OR b.package != ?);",
@@ -258,8 +255,30 @@ class Application(object):
                     duplicate = sum(len(files) for _, files in mapping.values())
                     savable = sum(size * len(files) for size, files in mapping.values())
                     curstats.append(dict(package=pkg, duplicate=duplicate, savable=savable))
+        return sharedstats
 
-        params["shared"] = sharedstats
+    def cached_sharedstats(self, package):
+        cur = self.db.cursor()
+        sharedstats = {}
+        cur.execute("SELECT package2, func1, func2, files, size FROM sharing WHERE package1 = ?;",
+                    (package,))
+        for package2, func1, func2, files, size in fetchiter(cur):
+            if (func1, func2) not in hash_functions:
+                continue
+            if func1 == func2:
+                func = func1
+            else:
+                func = "%s -> %s" % (func1, func2)
+            curstats = sharedstats.setdefault(func, list())
+            if package2 == package:
+                package2 = None
+            curstats.append(dict(package=package2, duplicate=files, savable=size))
+        return sharedstats
+
+    def show_package(self, package):
+        params = self.get_details(package)
+        params["dependencies"] = self.get_dependencies(package)
+        params["shared"] = self.cached_sharedstats(package)
         return html_response(package_template.render(params))
 
     def show_detail(self, package1, package2):
