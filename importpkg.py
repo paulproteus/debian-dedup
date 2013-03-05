@@ -132,7 +132,7 @@ def process_package(db, filelike):
                 control = deb822.Packages(control)
                 package = control["package"].encode("ascii")
                 try:
-                    source = control["source"].encode("ascii")
+                    source = control["source"].encode("ascii").split()[0]
                 except KeyError:
                     source = package
                 version = control["version"].encode("ascii")
