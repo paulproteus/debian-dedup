@@ -35,6 +35,11 @@ def format_size(size):
         fmt = "%.1f GB"
     return fmt % size
 
+def function_combination(function1, function2):
+    if function1 == function2:
+        return function1
+    return "%s -> %s" % (function1, function2)
+
 jinjaenv.filters["format_size"] = format_size
 
 base_template = jinjaenv.get_template("base.html")
@@ -241,11 +246,7 @@ class Application(object):
                 fileset = hashdict.setdefault(hashval, (size, set()))[1]
                 fileset.add(afile)
             if sharing:
-                curstats = list()
-                if func1 == func2:
-                    sharedstats[func1] = curstats
-                else:
-                    sharedstats["%s -> %s" % (func1, func2)] = curstats
+                sharedstats[function_combination(func1, func2)] = curstats = []
                 mapping = sharing.pop(package, dict())
                 if mapping:
                     duplicate = sum(len(files) for _, files in mapping.values())
@@ -265,11 +266,8 @@ class Application(object):
         for package2, func1, func2, files, size in fetchiter(cur):
             if (func1, func2) not in hash_functions:
                 continue
-            if func1 == func2:
-                func = func1
-            else:
-                func = "%s -> %s" % (func1, func2)
-            curstats = sharedstats.setdefault(func, list())
+            curstats = sharedstats.setdefault(
+                    function_combination(func1, func2), list())
             if package2 == package:
                 package2 = None
             curstats.append(dict(package=package2, duplicate=files, savable=size))
