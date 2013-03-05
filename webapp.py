@@ -145,6 +145,22 @@ index_template = jinjaenv.from_string(
 </ul>
 {% endblock %}""")
 
+source_template = jinjaenv.from_string(
+"""{% extends "base.html" %}
+{% block title %}overview of {{ source|e }}{% endblock %}
+{% block content %}
+<h1>overview of {{ source|e }}</h1>
+<table border='1'><tr><th>binary from {{ source|e }}</th><th>savable</th><th>other package</th></tr>
+{% for package, sharing in packages.items() %}
+    <tr><td><a href="../binary/{{ package|e }}">{{ package|e }}</td><td>
+    {%- if sharing -%}
+        {{ sharing.savable|format_size }}</td><td><a href="../binary/{{ sharing.package|e }}">{{ sharing.package|e }}</a> <a href="../compare/{{ package|e }}/{{ sharing.package|e }}">compare</a>
+    {%- else -%}</td><td>{%- endif -%}
+    </td></tr>
+{% endfor %}
+</table>
+{% endblock %}""")
+
 def encode_and_buffer(iterator):
     buff = b""
     for elem in iterator:
@@ -190,6 +206,7 @@ class Application(object):
             Rule("/binary/<package>", methods=("GET",), endpoint="package"),
             Rule("/compare/<package1>/<package2>", methods=("GET",), endpoint="detail"),
             Rule("/hash/<function>/<hashvalue>", methods=("GET",), endpoint="hash"),
+            Rule("/source/<package>", methods=("GET",), endpoint="source"),
         ])
 
     @Request.application
@@ -207,6 +224,8 @@ class Application(object):
                 if not request.environ["PATH_INFO"]:
                     raise RequestRedirect(request.environ["SCRIPT_NAME"] + "/")
                 return html_response(index_template.stream())
+            elif endpoint == "source":
+                return self.show_source(args["package"])
             raise NotFound()
         except HTTPException as e:
             return e
@@ -312,6 +331,25 @@ class Application(object):
             raise NotFound()
         params = dict(function=function, hashvalue=hashvalue, entries=entries)
         return html_response(hash_template.render(params))
+
+    def show_source(self, package):
+        cur = self.db.cursor()
+        cur.execute("SELECT package FROM source WHERE source = ?;",
+                    (package,))
+        binpkgs = dict.fromkeys(pkg for pkg, in fetchiter(cur))
+        if not binpkgs:
+            raise NotFound
+        cur.execute("SELECT source.package, sharing.package2, sharing.func1, sharing.func2, sharing.files, sharing.size FROM source JOIN sharing ON source.package = sharing.package1 WHERE source.source = ?;",
+                    (package,))
+        for binary, otherbin, func1, func2, files, size in fetchiter(cur):
+            entry = dict(package=otherbin,
+                         funccomb=function_combination(func1, func2),
+                         duplicate=files, savable=size)
+            oldentry = binpkgs.get(binary)
+            if not (oldentry and oldentry["savable"] >= size):
+                binpkgs[binary] = entry
+        params = dict(source=package, packages=binpkgs)
+        return html_response(source_template.render(params))
 
 def main():
     app = Application(sqlite3.connect("test.sqlite3"))
