@@ -31,3 +31,5 @@ SQL database by hand. Example queries:
     SELECT a.package, a.filename, b.package, b.filename, a.size FROM content AS a JOIN content AS b ON a.hash = b.hash WHERE (a.package != b.package OR a.filename != b.filename) ORDER BY a.size DESC LIMIT 100;
 
     SELECT hash, sum(size)-min(size), count(*), count(distinct package) FROM content GROUP BY hash ORDER BY sum(size)-min(size) DESC LIMIT 100;
+
+    SELECT package, filename, size FROM content WHERE function = "image_sha512" AND filename NOT LIKE "%.png";
