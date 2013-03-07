@@ -148,8 +148,8 @@ def process_package(db, filelike):
                             (package,))
                 cur.execute("DELETE FROM content WHERE package = ?;",
                             (package,))
-                cur.execute("INSERT INTO package (package, version, architecture) VALUES (?, ?, ?);",
-                            (package, version, architecture))
+                cur.execute("INSERT INTO package (package, version, architecture, source) VALUES (?, ?, ?, ?);",
+                            (package, version, architecture, source))
                 depends = control.relations.get("depends", [])
                 depends = set(dep[0]["name"].encode("ascii")
                               for dep in depends if len(dep) == 1)
@@ -157,10 +157,6 @@ def process_package(db, filelike):
                             (package,))
                 cur.executemany("INSERT INTO dependency (package, required) VALUES (?, ?);",
                                 ((package, dep) for dep in depends))
-                cur.execute("DELETE FROM source WHERE package = ?;",
-                            (package,))
-                cur.execute("INSERT INTO source (source, package) VALUES (?, ?);",
-                            (source, package))
                 break
             continue
         elif name == "data.tar.gz":

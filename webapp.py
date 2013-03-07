@@ -334,12 +334,12 @@ class Application(object):
 
     def show_source(self, package):
         cur = self.db.cursor()
-        cur.execute("SELECT package FROM source WHERE source = ?;",
+        cur.execute("SELECT package FROM package WHERE source = ?;",
                     (package,))
         binpkgs = dict.fromkeys(pkg for pkg, in fetchiter(cur))
         if not binpkgs:
             raise NotFound
-        cur.execute("SELECT source.package, sharing.package2, sharing.func1, sharing.func2, sharing.files, sharing.size FROM source JOIN sharing ON source.package = sharing.package1 WHERE source.source = ?;",
+        cur.execute("SELECT package.package, sharing.package2, sharing.func1, sharing.func2, sharing.files, sharing.size FROM package JOIN sharing ON package.package = sharing.package1 WHERE package.source = ?;",
                     (package,))
         for binary, otherbin, func1, func2, files, size in fetchiter(cur):
             entry = dict(package=otherbin,
