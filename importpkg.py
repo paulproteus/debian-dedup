@@ -109,6 +109,7 @@ def get_hashes(tar):
 
 def process_package(db, filelike):
     cur = db.cursor()
+    cur.execute("PRAGMA foreign_keys = ON;")
     af = ArReader(filelike)
     af.read_magic()
     state = "start"
@@ -144,11 +145,9 @@ def process_package(db, filelike):
                 if row and version_compare(row[0], version) > 0:
                     return # already seen a newer package
 
-                cur.execute("DELETE FROM package WHERE package = ?;",
-                            (package,))
                 cur.execute("DELETE FROM content WHERE package = ?;",
                             (package,))
-                cur.execute("INSERT INTO package (package, version, architecture, source) VALUES (?, ?, ?, ?);",
+                cur.execute("INSERT OR REPLACE INTO package (package, version, architecture, source) VALUES (?, ?, ?, ?);",
                             (package, version, architecture, source))
                 depends = control.relations.get("depends", [])
                 depends = set(dep[0]["name"].encode("ascii")

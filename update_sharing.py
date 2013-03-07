@@ -40,6 +40,7 @@ def process_pkgdict(cursor, pkgdict):
 def main():
     db = sqlite3.connect("test.sqlite3")
     cur = db.cursor()
+    cur.execute("PRAGMA foreign_keys = ON;")
     cur.execute("DELETE FROM sharing;")
     readcur = db.cursor()
     readcur.execute("SELECT hash FROM content GROUP BY hash HAVING count(*) > 1;")
