@@ -1,7 +1,7 @@
 Required packages
 -----------------
 
-aptitude install python python-debian python-lzma curl python-jinja2 python-werkzeug sqlite3 python-imaging
+    aptitude install python python-debian python-lzma curl python-jinja2 python-werkzeug sqlite3 python-imaging
 
 Create a database
 -----------------
@@ -26,10 +26,21 @@ Import a full mirror::
 Viewing the results
 -------------------
 Run `./webapp.py` and enjoy a webinterface at `0.0.0.0:8800` or inspect the
-SQL database by hand. Example queries:
+SQL database by hand. Here are some example queries.
+
+Finding the 100 largest files shared with multiple packages.
 
     SELECT a.package, a.filename, b.package, b.filename, a.size FROM content AS a JOIN content AS b ON a.hash = b.hash WHERE (a.package != b.package OR a.filename != b.filename) ORDER BY a.size DESC LIMIT 100;
 
+Finding those top 100 files that save most space when being reduced to only
+one copy in the archive.
+
     SELECT hash, sum(size)-min(size), count(*), count(distinct package) FROM content GROUP BY hash ORDER BY sum(size)-min(size) DESC LIMIT 100;
 
+Finding PNG images that do not carry a .png file extension.
+
     SELECT package, filename, size FROM content WHERE function = "image_sha512" AND filename NOT LIKE "%.png";
+
+Finding .gz files which either are not gziped or contain errors.
+
+    SELECT package, filename FROM content AS a WHERE function = "sha512" AND filename LIKE "%.gz" AND (SELECT count(*) FROM content AS b WHERE b.package = a.package AND b.filename = a.filename AND b.function = "gzip_sha512") = 0;
