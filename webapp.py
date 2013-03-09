@@ -253,30 +253,6 @@ class Application(object):
                     (package,))
         return set(row[0] for row in fetchiter(cur))
 
-    def compute_sharedstats(self, package):
-        cur = self.db.cursor()
-        sharedstats = {}
-        for func1, func2 in hash_functions:
-            cur.execute("SELECT a.filename, a.hash, a.size, b.package FROM content AS a JOIN content AS b ON a.hash = b.hash WHERE a.package = ? AND a.function = ? AND b.function = ? AND (a.filename != b.filename OR b.package != ?);",
-                        (package, func1, func2, package))
-            sharing = dict()
-            for afile, hashval, size, bpkg in fetchiter(cur):
-                hashdict = sharing.setdefault(bpkg, dict())
-                fileset = hashdict.setdefault(hashval, (size, set()))[1]
-                fileset.add(afile)
-            if sharing:
-                sharedstats[function_combination(func1, func2)] = curstats = []
-                mapping = sharing.pop(package, dict())
-                if mapping:
-                    duplicate = sum(len(files) for _, files in mapping.values())
-                    savable = sum(size * (len(files) - 1) for size, files in mapping.values())
-                    curstats.append(dict(package=None, duplicate=duplicate, savable=savable))
-                for pkg, mapping in sharing.items():
-                    duplicate = sum(len(files) for _, files in mapping.values())
-                    savable = sum(size * len(files) for size, files in mapping.values())
-                    curstats.append(dict(package=pkg, duplicate=duplicate, savable=savable))
-        return sharedstats
-
     def cached_sharedstats(self, package):
         cur = self.db.cursor()
         sharedstats = {}
