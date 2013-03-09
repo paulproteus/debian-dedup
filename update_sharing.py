@@ -43,9 +43,9 @@ def main():
     cur.execute("PRAGMA foreign_keys = ON;")
     cur.execute("DELETE FROM sharing;")
     readcur = db.cursor()
-    readcur.execute("SELECT hash FROM content GROUP BY hash HAVING count(*) > 1;")
+    readcur.execute("SELECT hash FROM hash GROUP BY hash HAVING count(*) > 1;")
     for hashvalue, in fetchiter(readcur):
-        cur.execute("SELECT package, filename, size, function FROM content WHERE hash = ?;",
+        cur.execute("SELECT content.package, content.filename, content.size, hash.function FROM hash JOIN content ON hash.cid = content.id WHERE hash = ?;",
                     (hashvalue,))
         rows = cur.fetchall()
         print("processing hash %s with %d entries" % (hashvalue, len(rows)))

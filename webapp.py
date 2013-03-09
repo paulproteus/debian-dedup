@@ -279,13 +279,13 @@ class Application(object):
         if package1 == package2:
             details1 = details2 = self.get_details(package1)
 
-            cur.execute("SELECT a.filename, a.size, a.function, b.filename, b.size, b.function, a.hash FROM content AS a JOIN content AS b ON a.hash = b.hash WHERE a.package = ? AND b.package = ? AND a.filename != b.filename ORDER BY a.size DESC, a.filename, b.filename;",
+            cur.execute("SELECT a.filename, a.size, ha.function, b.filename, b.size, hb.function, ha.hash FROM content AS a JOIN hash AS ha ON a.id = ha.cid JOIN hash AS hb ON ha.hash = hb.hash JOIN content AS b ON b.id = hb.cid WHERE a.package = ? AND b.package = ? AND a.filename != b.filename ORDER BY a.size DESC, a.filename, b.filename;",
                         (package1, package1))
         else:
             details1 = self.get_details(package1)
             details2 = self.get_details(package2)
 
-            cur.execute("SELECT a.filename, a.size, a.function, b.filename, b.size, b.function, a.hash FROM content AS a JOIN content AS b ON a.hash = b.hash WHERE a.package = ? AND b.package = ? ORDER BY a.size DESC, a.filename, b.filename;",
+            cur.execute("SELECT a.filename, a.size, ha.function, b.filename, b.size, hb.function, ha.hash FROM content AS a JOIN hash AS ha ON a.id = ha.cid JOIN hash AS hb ON ha.hash = hb.hash JOIN content AS b ON b.id = hb.cid WHERE a.package = ? AND b.package = ? ORDER BY a.size DESC, a.filename, b.filename;",
                         (package1, package2))
         shared = generate_shared(fetchiter(cur))
         # The cursor will be in use until the template is fully rendered.
@@ -297,7 +297,7 @@ class Application(object):
 
     def show_hash(self, function, hashvalue):
         cur = self.db.cursor()
-        cur.execute("SELECT package, filename, size, function FROM content WHERE hash = ?;",
+        cur.execute("SELECT content.package, content.filename, content.size, hash.function FROM content JOIN hash ON content.id = hash.cid WHERE hash = ?;",
                     (hashvalue,))
         entries = [dict(package=package, filename=filename, size=size,
                         function=otherfunc)
