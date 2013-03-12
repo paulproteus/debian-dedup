@@ -2,7 +2,6 @@
 
 import hashlib
 import sqlite3
-import struct
 import sys
 import tarfile
 import zlib
@@ -11,61 +10,10 @@ from debian.debian_support import version_compare
 from debian import deb822
 import lzma
 
+from dedup.arreader import ArReader
 from dedup.hashing import HashBlacklist, DecompressedHash, SuppressingHash, hash_file
 from dedup.compression import GzipDecompressor, DecompressedStream
 from dedup.image import ImageHash
-
-class ArReader(object):
-    global_magic = b"!<arch>\n"
-    file_magic = b"`\n"
-
-    def __init__(self, fileobj):
-        self.fileobj = fileobj
-        self.remaining = None
-        self.padding = 0
-
-    def skip(self, length):
-        while length:
-            data = self.fileobj.read(min(4096, length))
-            if not data:
-                raise ValueError("archive truncated")
-            length -= len(data)
-
-    def read_magic(self):
-        data = self.fileobj.read(len(self.global_magic))
-        if data != self.global_magic:
-            raise ValueError("ar global header not found")
-        self.remaining = 0
-
-    def read_entry(self):
-        self.skip_current_entry()
-        if self.padding:
-            if self.fileobj.read(1) != '\n':
-                raise ValueError("missing ar padding")
-            self.padding = 0
-        file_header = self.fileobj.read(60)
-        if not file_header:
-            raise EOFError("end of archive found")
-        parts = struct.unpack("16s 12s 6s 6s 8s 10s 2s", file_header)
-        parts = [p.rstrip(" ") for p in parts]
-        if parts.pop() != self.file_magic:
-            raise ValueError("ar file header not found")
-        self.remaining = int(parts[5])
-        self.padding = self.remaining % 2
-        return parts[0] # name
-
-    def skip_current_entry(self):
-        self.skip(self.remaining)
-        self.remaining = 0
-
-    def read(self, length=None):
-        if length is None:
-            length = self.remaining
-        else:
-            length = min(self.remaining, length)
-        data = self.fileobj.read(length)
-        self.remaining -= len(data)
-        return data
 
 class MultiHash(object):
     def __init__(self, *hashes):
