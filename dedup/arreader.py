@@ -45,7 +45,7 @@ class ArReader(object):
         if not file_header:
             raise EOFError("end of archive found")
         parts = struct.unpack("16s 12s 6s 6s 8s 10s 2s", file_header)
-        parts = [p.rstrip(" ") for p in parts]
+        parts = [p.rstrip(b" ") for p in parts]
         if parts.pop() != self.file_magic:
             raise ValueError("ar file header not found")
         self.remaining = int(parts[5])
