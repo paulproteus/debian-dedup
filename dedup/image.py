@@ -50,7 +50,10 @@ class ImageHash(object):
         pos = self.content.tell()
         try:
             self.content.seek(0)
-            img = PIL.Image.open(self.content)
+            try:
+                img = PIL.Image.open(self.content)
+            except IOError:
+                raise ValueError("broken png header")
             width, height = img.size
             pack = lambda elem: struct.pack("BBBB", *elem)
             # special casing easy modes reduces memory usage
@@ -60,8 +63,11 @@ class ImageHash(object):
                 pack = lambda elem: struct.pack("BBBB", *(elem + (255,)))
             elif img.mode != "RGBA":
                 img = img.convert("RGBA")
-            for elem in img.getdata():
-                hashobj.update(pack(elem))
+            try:
+                for elem in img.getdata():
+                    hashobj.update(pack(elem))
+            except (SyntaxError, IndexError, IOError): # crazy stuff from PIL
+                raise ValueError("error reading png image")
         finally:
             self.content.seek(pos)
         return "%s%8.8x%8.8x" % (hashobj.hexdigest(), width, height)
