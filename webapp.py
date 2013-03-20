@@ -21,7 +21,6 @@ hash_functions = [
 jinjaenv = jinja2.Environment(loader=jinja2.FileSystemLoader("."))
 
 def format_size(size):
-    assert isinstance(size, int)
     size = float(size)
     fmt = "%d B"
     if size >= 1024:
