@@ -50,13 +50,16 @@ def get_hashes(tar):
             continue
         hasher = MultiHash(sha512_nontrivial(), gziphash(), imagehash())
         hasher = hash_file(hasher, tar.extractfile(elem))
+        hashes = {}
         for hashobj in hasher.hashes:
             hashvalue = hashobj.hexdigest()
             if hashvalue:
-                yield (elem.name, elem.size, hashobj.name, hashvalue)
+                hashes[hashobj.name] = hashvalue
+        yield (elem.name, elem.size, hashes)
 
 def process_package(db, filelike):
     cur = db.cursor()
+    cur.execute("PRAGMA foreign_keys = ON;")
     af = ArReader(filelike)
     af.read_magic()
     state = "start"
@@ -92,12 +95,10 @@ def process_package(db, filelike):
                 if row and version_compare(row[0], version) > 0:
                     return # already seen a newer package
 
-                cur.execute("DELETE FROM package WHERE package = ?;",
-                            (package,))
                 cur.execute("DELETE FROM content WHERE package = ?;",
                             (package,))
-                cur.execute("INSERT INTO package (package, version, architecture) VALUES (?, ?, ?);",
-                            (package, version, architecture))
+                cur.execute("INSERT OR REPLACE INTO package (package, version, architecture, source) VALUES (?, ?, ?, ?);",
+                            (package, version, architecture, source))
                 depends = control.relations.get("depends", [])
                 depends = set(dep[0]["name"].encode("ascii")
                               for dep in depends if len(dep) == 1)
@@ -105,10 +106,6 @@ def process_package(db, filelike):
                             (package,))
                 cur.executemany("INSERT INTO dependency (package, required) VALUES (?, ?);",
                                 ((package, dep) for dep in depends))
-                cur.execute("DELETE FROM source WHERE package = ?;",
-                            (package,))
-                cur.execute("INSERT INTO source (source, package) VALUES (?, ?);",
-                            (source, package))
                 break
             continue
         elif name == "data.tar.gz":
@@ -122,14 +119,17 @@ def process_package(db, filelike):
             continue
         if state != "control_file":
             raise ValueError("missing control file")
-        for name, size, function, hexhash in get_hashes(tf):
+        for name, size, hashes in get_hashes(tf):
             try:
                 name = name.decode("utf8")
             except UnicodeDecodeError:
                 print("warning: skipping filename with encoding error")
                 continue # skip files with non-utf8 encoding for now
-            cur.execute("INSERT INTO content (package, filename, size, function, hash) VALUES (?, ?, ?, ?, ?);",
-                        (package, name, size, function, hexhash))
+            cur.execute("INSERT INTO content (package, filename, size) VALUES (?, ?, ?);",
+                        (package, name, size))
+            cid = cur.lastrowid
+            cur.executemany("INSERT INTO hash (cid, function, hash) VALUES (?, ?, ?);",
+                            ((cid, func, hexhash) for func, hexhash in hashes.items()))
         db.commit()
         return
     raise ValueError("data.tar not found")

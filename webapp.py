@@ -252,30 +252,6 @@ class Application(object):
                     (package,))
         return set(row[0] for row in fetchiter(cur))
 
-    def compute_sharedstats(self, package):
-        cur = self.db.cursor()
-        sharedstats = {}
-        for func1, func2 in hash_functions:
-            cur.execute("SELECT a.filename, a.hash, a.size, b.package FROM content AS a JOIN content AS b ON a.hash = b.hash WHERE a.package = ? AND a.function = ? AND b.function = ? AND (a.filename != b.filename OR b.package != ?);",
-                        (package, func1, func2, package))
-            sharing = dict()
-            for afile, hashval, size, bpkg in fetchiter(cur):
-                hashdict = sharing.setdefault(bpkg, dict())
-                fileset = hashdict.setdefault(hashval, (size, set()))[1]
-                fileset.add(afile)
-            if sharing:
-                sharedstats[function_combination(func1, func2)] = curstats = []
-                mapping = sharing.pop(package, dict())
-                if mapping:
-                    duplicate = sum(len(files) for _, files in mapping.values())
-                    savable = sum(size * (len(files) - 1) for size, files in mapping.values())
-                    curstats.append(dict(package=None, duplicate=duplicate, savable=savable))
-                for pkg, mapping in sharing.items():
-                    duplicate = sum(len(files) for _, files in mapping.values())
-                    savable = sum(size * len(files) for size, files in mapping.values())
-                    curstats.append(dict(package=pkg, duplicate=duplicate, savable=savable))
-        return sharedstats
-
     def cached_sharedstats(self, package):
         cur = self.db.cursor()
         sharedstats = {}
@@ -302,13 +278,13 @@ class Application(object):
         if package1 == package2:
             details1 = details2 = self.get_details(package1)
 
-            cur.execute("SELECT a.filename, a.size, a.function, b.filename, b.size, b.function, a.hash FROM content AS a JOIN content AS b ON a.hash = b.hash WHERE a.package = ? AND b.package = ? AND a.filename != b.filename ORDER BY a.size DESC, a.filename, b.filename;",
+            cur.execute("SELECT a.filename, a.size, ha.function, b.filename, b.size, hb.function, ha.hash FROM content AS a JOIN hash AS ha ON a.id = ha.cid JOIN hash AS hb ON ha.hash = hb.hash JOIN content AS b ON b.id = hb.cid WHERE a.package = ? AND b.package = ? AND a.filename != b.filename ORDER BY a.size DESC, a.filename, b.filename;",
                         (package1, package1))
         else:
             details1 = self.get_details(package1)
             details2 = self.get_details(package2)
 
-            cur.execute("SELECT a.filename, a.size, a.function, b.filename, b.size, b.function, a.hash FROM content AS a JOIN content AS b ON a.hash = b.hash WHERE a.package = ? AND b.package = ? ORDER BY a.size DESC, a.filename, b.filename;",
+            cur.execute("SELECT a.filename, a.size, ha.function, b.filename, b.size, hb.function, ha.hash FROM content AS a JOIN hash AS ha ON a.id = ha.cid JOIN hash AS hb ON ha.hash = hb.hash JOIN content AS b ON b.id = hb.cid WHERE a.package = ? AND b.package = ? ORDER BY a.size DESC, a.filename, b.filename;",
                         (package1, package2))
         shared = generate_shared(fetchiter(cur))
         # The cursor will be in use until the template is fully rendered.
@@ -320,7 +296,7 @@ class Application(object):
 
     def show_hash(self, function, hashvalue):
         cur = self.db.cursor()
-        cur.execute("SELECT package, filename, size, function FROM content WHERE hash = ?;",
+        cur.execute("SELECT content.package, content.filename, content.size, hash.function FROM content JOIN hash ON content.id = hash.cid WHERE hash = ?;",
                     (hashvalue,))
         entries = [dict(package=package, filename=filename, size=size,
                         function=otherfunc)
@@ -333,12 +309,12 @@ class Application(object):
 
     def show_source(self, package):
         cur = self.db.cursor()
-        cur.execute("SELECT package FROM source WHERE source = ?;",
+        cur.execute("SELECT package FROM package WHERE source = ?;",
                     (package,))
         binpkgs = dict.fromkeys(pkg for pkg, in fetchiter(cur))
         if not binpkgs:
             raise NotFound
-        cur.execute("SELECT source.package, sharing.package2, sharing.func1, sharing.func2, sharing.files, sharing.size FROM source JOIN sharing ON source.package = sharing.package1 WHERE source.source = ?;",
+        cur.execute("SELECT package.package, sharing.package2, sharing.func1, sharing.func2, sharing.files, sharing.size FROM package JOIN sharing ON package.package = sharing.package1 WHERE package.source = ?;",
                     (package,))
         for binary, otherbin, func1, func2, files, size in fetchiter(cur):
             entry = dict(package=otherbin,

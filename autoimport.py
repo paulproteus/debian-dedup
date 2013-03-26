@@ -14,6 +14,7 @@ def main():
     urlbase = sys.argv[1]
     db = sqlite3.connect("test.sqlite3")
     cur = db.cursor()
+    cur.execute("PRAGMA foreign_keys = ON;")
     cur.execute("SELECT package, version FROM package;")
     knownpkgs = dict((row[0], row[1]) for row in cur.fetchall())
 
@@ -37,13 +38,10 @@ def main():
     
     delpkgs = set(knownpkgs) - distpkgs
     print("clearing packages %s" % " ".join(delpkgs))
-    cur.execute("PRAGMA foreign_keys=1;")
-    cur.executemany("DELETE FROM content WHERE package = ?;",
-                    ((pkg,) for pkg in delpkgs))
-    cur.executemany("DELETE FROM dependency WHERE package = ?;",
-                    ((pkg,) for pkg in delpkgs))
     cur.executemany("DELETE FROM package WHERE package = ?;",
                     ((pkg,) for pkg in delpkgs))
+    # Tables content, dependency and sharing will also be pruned
+    # due to ON DELETE CASCADE clauses.
     db.commit()
 
 if __name__ == "__main__":
