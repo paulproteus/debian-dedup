@@ -240,7 +240,7 @@ class Application(object):
         details = dict(package=package,
                        version=version,
                        architecture=architecture)
-        cur.execute("SELECT count(filename), sum(size) FROM content WHERE package = ? AND function = 'sha512';",
+        cur.execute("SELECT count(filename), sum(size) FROM content WHERE package = ?;",
                     (package,))
         num_files, total_size = cur.fetchone()
         details.update(dict(num_files=num_files, total_size=total_size))
