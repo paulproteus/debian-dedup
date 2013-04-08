@@ -43,4 +43,4 @@ Finding PNG images that do not carry a .png file extension.
 
 Finding .gz files which either are not gziped or contain errors.
 
-    SELECT a.package, a.filename FROM content AS a JOIN hash AS ha ON a.id = ha.cid WHERE ha.function = "sha512" AND a.filename LIKE "%.gz" AND (SELECT count(*) FROM content AS b JOIN hash AS hb ON b.id = hb.cid WHERE b.package = a.package AND b.filename = a.filename AND hb.function = "gzip_sha512") = 0;
+    SELECT content.package, content.filename FROM content WHERE filename LIKE "%.gz" AND (SELECT count(*) FROM hash WHERE hash.cid = content.id AND hash.function = "gzip_sha512") = 0;
