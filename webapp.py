@@ -65,6 +65,7 @@ package_template = jinjaenv.from_string(
         {%- endfor -%}
         </table>
     {%- endfor -%}
+<p>Note: Packages with yellow background are required to be installed when this package is installed.</p>
 {%- endif -%}
 {% endblock %}""")
 
@@ -158,6 +159,7 @@ source_template = jinjaenv.from_string(
     </td></tr>
 {% endfor %}
 </table>
+<p>Note: Not all sharing listed here. Click on binary packages with non-zero savable to see more.</p>
 {% endblock %}""")
 
 def encode_and_buffer(iterator):
