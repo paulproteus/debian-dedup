@@ -74,14 +74,21 @@ detail_template = jinjaenv.from_string(
 {% block title %}sharing between {{ details1.package|e }} and {{ details2.package|e }}{% endblock%}
 {% block content %}
 <h1><a href="../../binary/{{ details1.package|e }}">{{ details1.package|e }}</a> &lt;-&gt; <a href="../../binary/{{ details2.package|e }}">{{ details2.package|e }}</a></h1>
-<table border='1'><tr><th colspan="3">{{ details1.package|e }}</th><th colspan="3">{{ details2.package|e }}</th></tr>
-<tr><th>size</th><th>filename</th><th>hash functions</th><th>size</th><th>filename</th><th>hash functions</th></tr>
-    {%- for entry in shared -%}
-        <tr><td>{{ entry.size1|format_size }}</td><td>{{ entry.filename1 }}</td><td>
-            {%- for funccomb, hashvalue in entry.functions.items() %}<a href="../../hash/{{ funccomb[0]|e }}/{{ hashvalue|e }}">{{ funccomb[0]|e }}</a> {% endfor %}</td>
-        <td>{{ entry.size2|format_size }}</td><td>{{ entry.filename2 }}</td><td>
-            {%- for funccomb, hashvalue in entry.functions.items() %}<a href="../../hash/{{ funccomb[1]|e }}/{{ hashvalue|e }}">{{ funccomb[1]|e }}</a> {% endfor %}</td></tr>
+<table border='1'><tr><th colspan="2">{{ details1.package|e }}</th><th colspan="2">{{ details2.package|e }}</th></tr>
+<tr><th>size</th><th>filename</th><th>hash functions</th><th>filename</th></tr>
+{%- for entry in shared -%}
+    <tr><td rowspan={{ entry.matches|length }}>{{ entry.size|format_size }}</td><td rowspan={{ entry.matches|length }}>
+    {%- for filename in entry.filenames %}{{ filename|e }}{% if not loop.last %}<br>{% endif %}{% endfor -%}</td><td>
+    {% for filename, match in entry.matches.items() -%}
+        {% if not loop.first %}<tr><td>{% endif -%}
+        {%- for funccomb, hashvalue in match.items() -%}
+            <a href="../../hash/{{ funccomb[0]|e }}/{{ hashvalue|e }}">{{ funccomb[0]|e }}</a>
+            {%- if funccomb[0] != funccomb[1] %} -&gt; <a href="../../hash/{{ funccomb[1]|e }}/{{ hashvalue|e }}">{{ funccomb[1]|e }}</a>{% endif %}
+            {%- if not loop.last %}, {% endif %}
+        {%- endfor %}</td><td>
+        {{- filename|e }}</td></tr>
     {%- endfor -%}
+{%- endfor -%}
 </table>
 {% endblock %}""")
 
@@ -275,21 +282,56 @@ class Application(object):
         params["shared"] = self.cached_sharedstats(package)
         return html_response(package_template.render(params))
 
-    def show_detail(self, package1, package2):
+    def compute_comparison(self, package1, package2):
+        """Compute a sequence of comparison objects ordery by the size of the
+        object in the first package. Each element of the sequence is a dict
+        defining the following keys:
+         * filenames: A set of filenames in package1 all referring to the
+           same object.
+         * size: Size of the object in bytes.
+         * matches: A mapping from filenames in package2 to a mapping from
+           hash function pairs to hash values.
+        """
         cur = self.db.cursor()
-        if package1 == package2:
-            details1 = details2 = self.get_details(package1)
+        cur.execute("SELECT id, filename, size, hash FROM content JOIN hash ON content.id = hash.cid JOIN duplicate ON content.id = duplicate.cid WHERE package = ? AND function = 'sha512' ORDER BY size DESC;",
+                    (package1,))
+        cursize = -1
+        files = dict()
+        minmatch = 2 if package1 == package2 else 1
+        for cid, filename, size, hashvalue in fetchiter(cur):
+            if cursize != size:
+                for entry in files.values():
+                    if len(entry["matches"]) >= minmatch:
+                        yield entry
+                files.clear()
+                cursize = size
 
-            cur.execute("SELECT a.filename, a.size, ha.function, b.filename, b.size, hb.function, ha.hash FROM content AS a JOIN hash AS ha ON a.id = ha.cid JOIN hash AS hb ON ha.hash = hb.hash JOIN content AS b ON b.id = hb.cid WHERE a.package = ? AND b.package = ? AND a.filename != b.filename ORDER BY a.size DESC, a.filename, b.filename;",
-                        (package1, package1))
-        else:
-            details1 = self.get_details(package1)
+            if hashvalue in files:
+                files[hashvalue]["filenames"].add(filename)
+                continue
+
+            entry = dict(filenames=set((filename,)), size=size, matches={})
+            files[hashvalue] = entry
+
+            cur2 = self.db.cursor()
+            cur2.execute("SELECT ha.function, ha.hash, hb.function, filename FROM hash AS ha JOIN hash AS hb ON ha.hash = hb.hash JOIN content ON hb.cid = content.id WHERE ha.cid = ? AND package = ?;",
+                         (cid, package2))
+            for func1, hashvalue, func2, filename in fetchiter(cur2):
+                entry["matches"].setdefault(filename, {})[func1, func2] = \
+                        hashvalue
+            cur2.close()
+        cur.close()
+
+        for entry in files.values():
+            if len(entry["matches"]) >= minmatch:
+                yield entry
+
+    def show_detail(self, package1, package2):
+        details1 = details2 = self.get_details(package1)
+        if package1 != package2:
             details2 = self.get_details(package2)
 
-            cur.execute("SELECT a.filename, a.size, ha.function, b.filename, b.size, hb.function, ha.hash FROM content AS a JOIN hash AS ha ON a.id = ha.cid JOIN hash AS hb ON ha.hash = hb.hash JOIN content AS b ON b.id = hb.cid WHERE a.package = ? AND b.package = ? ORDER BY a.size DESC, a.filename, b.filename;",
-                        (package1, package2))
-        shared = generate_shared(fetchiter(cur))
-        # The cursor will be in use until the template is fully rendered.
+        shared = self.compute_comparison(package1, package2)
         params = dict(
             details1=details1,
             details2=details2,

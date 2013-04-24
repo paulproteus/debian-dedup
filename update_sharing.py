@@ -14,7 +14,7 @@ def add_values(cursor, insert_key, files, size):
 
 def compute_pkgdict(rows):
     pkgdict = dict()
-    for package, filename, size, function in rows:
+    for package, _, filename, size, function in rows:
         funcdict = pkgdict.setdefault(package, {})
         funcdict.setdefault(function, []).append((size, filename))
     return pkgdict
@@ -42,14 +42,17 @@ def main():
     cur = db.cursor()
     cur.execute("PRAGMA foreign_keys = ON;")
     cur.execute("DELETE FROM sharing;")
+    cur.execute("DELETE FROM duplicate;")
     readcur = db.cursor()
     readcur.execute("SELECT hash FROM hash GROUP BY hash HAVING count(*) > 1;")
     for hashvalue, in fetchiter(readcur):
-        cur.execute("SELECT content.package, content.filename, content.size, hash.function FROM hash JOIN content ON hash.cid = content.id WHERE hash = ?;",
+        cur.execute("SELECT content.package, content.id, content.filename, content.size, hash.function FROM hash JOIN content ON hash.cid = content.id WHERE hash = ?;",
                     (hashvalue,))
         rows = cur.fetchall()
         print("processing hash %s with %d entries" % (hashvalue, len(rows)))
         pkgdict = compute_pkgdict(rows)
+        cur.executemany("INSERT OR IGNORE INTO duplicate (cid) VALUES (?);",
+                        [(row[1],) for row in rows])
         process_pkgdict(cur, pkgdict)
     db.commit()
 
