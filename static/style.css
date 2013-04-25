@@ -7,3 +7,6 @@ td {
 .filename {
 	display: block;
 }
+.filename:hover {
+	background-color: #eee;
+}
