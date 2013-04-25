@@ -72,6 +72,7 @@ package_template = jinjaenv.from_string(
 detail_template = jinjaenv.from_string(
 """{% extends "base.html" %}
 {% block title %}sharing between {{ details1.package|e }} and {{ details2.package|e }}{% endblock%}
+{% block header %}<style type="text/css">td { vertical-align: top; } </style>{% endblock %}
 {% block content %}
 <h1><a href="../../binary/{{ details1.package|e }}">{{ details1.package|e }}</a> &lt;-&gt; <a href="../../binary/{{ details2.package|e }}">{{ details2.package|e }}</a></h1>
 <table border='1'><tr><th colspan="2">{{ details1.package|e }}</th><th colspan="2">{{ details2.package|e }}</th></tr>
