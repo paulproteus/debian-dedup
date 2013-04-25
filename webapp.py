@@ -79,15 +79,15 @@ detail_template = jinjaenv.from_string(
 <tr><th>size</th><th>filename</th><th>hash functions</th><th>filename</th></tr>
 {%- for entry in shared -%}
     <tr><td rowspan={{ entry.matches|length }}>{{ entry.size|format_size }}</td><td rowspan={{ entry.matches|length }}>
-    {%- for filename in entry.filenames %}{{ filename|e }}{% if not loop.last %}<br>{% endif %}{% endfor -%}</td><td>
+    {%- for filename in entry.filenames %}<span class="filename">{{ filename|e }}</span>{% if not loop.last %}<br>{% endif %}{% endfor -%}</td><td>
     {% for filename, match in entry.matches.items() -%}
         {% if not loop.first %}<tr><td>{% endif -%}
         {%- for funccomb, hashvalue in match.items() -%}
             <a href="../../hash/{{ funccomb[0]|e }}/{{ hashvalue|e }}">{{ funccomb[0]|e }}</a>
             {%- if funccomb[0] != funccomb[1] %} -&gt; <a href="../../hash/{{ funccomb[1]|e }}/{{ hashvalue|e }}">{{ funccomb[1]|e }}</a>{% endif %}
             {%- if not loop.last %}, {% endif %}
-        {%- endfor %}</td><td>
-        {{- filename|e }}</td></tr>
+        {%- endfor -%}
+        </td><td><span class="filename">{{ filename|e }}</span></td></tr>
     {%- endfor -%}
 {%- endfor -%}
 </table>
@@ -101,7 +101,7 @@ hash_template = jinjaenv.from_string(
 <table border='1'><tr><th>package</th><th>filename</th><th>size</th><th>different function</th></tr>
 {%- for entry in entries -%}
     <tr><td><a href="../../binary/{{ entry.package|e }}">{{ entry.package|e }}</a></td>
-    <td>{{ entry.filename|e }}</td><td>{{ entry.size|format_size }}</td>
+    <td><span class="filename">{{ entry.filename|e }}</span></td><td>{{ entry.size|format_size }}</td>
     <td>{% if function != entry.function %}{{ entry.function|e }}{% endif %}</td></tr>
 {%- endfor -%}
 </table>
