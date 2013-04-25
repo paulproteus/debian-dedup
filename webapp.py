@@ -253,6 +253,8 @@ class Application(object):
         cur.execute("SELECT count(filename), sum(size) FROM content WHERE package = ?;",
                     (package,))
         num_files, total_size = cur.fetchone()
+        if total_size is None:
+            total_size = 0
         details.update(dict(num_files=num_files, total_size=total_size))
         return details
 
