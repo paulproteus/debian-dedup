@@ -4,3 +4,6 @@
 td {
 	vertical-align: top;
 }
+.filename {
+	display: block;
+}

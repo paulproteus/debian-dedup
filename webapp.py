@@ -79,7 +79,7 @@ detail_template = jinjaenv.from_string(
 <tr><th>size</th><th>filename</th><th>hash functions</th><th>filename</th></tr>
 {%- for entry in shared -%}
     <tr><td rowspan={{ entry.matches|length }}>{{ entry.size|format_size }}</td><td rowspan={{ entry.matches|length }}>
-    {%- for filename in entry.filenames %}<span class="filename">{{ filename|e }}</span>{% if not loop.last %}<br>{% endif %}{% endfor -%}</td><td>
+    {%- for filename in entry.filenames %}<span class="filename">{{ filename|e }}</span>{% endfor -%}</td><td>
     {% for filename, match in entry.matches.items() -%}
         {% if not loop.first %}<tr><td>{% endif -%}
         {%- for funccomb, hashvalue in match.items() -%}
