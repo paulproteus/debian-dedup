@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import datetime
+import os.path
 import sqlite3
 from wsgiref.simple_server import make_server
 
@@ -8,6 +9,7 @@ import jinja2
 from werkzeug.exceptions import HTTPException, NotFound
 from werkzeug.routing import Map, Rule, RequestRedirect
 from werkzeug.wrappers import Request, Response
+from werkzeug.wsgi import SharedDataMiddleware
 
 from dedup.utils import fetchiter
 
@@ -46,7 +48,6 @@ base_template = jinjaenv.get_template("base.html")
 package_template = jinjaenv.from_string(
 """{% extends "base.html" %}
 {% block title %}duplication of {{ package|e }}{% endblock %}
-{% block header %}<style type="text/css">.dependency { background-color: yellow; } </style>{% endblock %}
 {% block content %}<h1>{{ package|e }}</h1>
 <p>Version: {{ version|e }}</p>
 <p>Architecture: {{ architecture|e }}</p>
@@ -72,7 +73,6 @@ package_template = jinjaenv.from_string(
 detail_template = jinjaenv.from_string(
 """{% extends "base.html" %}
 {% block title %}sharing between {{ details1.package|e }} and {{ details2.package|e }}{% endblock%}
-{% block header %}<style type="text/css">td { vertical-align: top; } </style>{% endblock %}
 {% block content %}
 <h1><a href="../../binary/{{ details1.package|e }}">{{ details1.package|e }}</a> &lt;-&gt; <a href="../../binary/{{ details2.package|e }}">{{ details2.package|e }}</a></h1>
 <table border='1'><tr><th colspan="2">{{ details1.package|e }}</th><th colspan="2">{{ details2.package|e }}</th></tr>
@@ -232,7 +232,7 @@ class Application(object):
             elif endpoint == "index":
                 if not request.environ["PATH_INFO"]:
                     raise RequestRedirect(request.environ["SCRIPT_NAME"] + "/")
-                return html_response(index_template.stream())
+                return html_response(index_template.render(dict(urlroot="")))
             elif endpoint == "source":
                 return self.show_source(args["package"])
             raise NotFound()
@@ -281,6 +281,7 @@ class Application(object):
         params = self.get_details(package)
         params["dependencies"] = self.get_dependencies(package)
         params["shared"] = self.cached_sharedstats(package)
+        params["urlroot"] = ".."
         return html_response(package_template.render(params))
 
     def compute_comparison(self, package1, package2):
@@ -336,6 +337,7 @@ class Application(object):
         params = dict(
             details1=details1,
             details2=details2,
+            urlroot="../..",
             shared=shared)
         return html_response(detail_template.stream(params))
 
@@ -349,7 +351,8 @@ class Application(object):
                    if (function, otherfunc) in hash_functions]
         if not entries:
             raise NotFound()
-        params = dict(function=function, hashvalue=hashvalue, entries=entries)
+        params = dict(function=function, hashvalue=hashvalue, entries=entries,
+                      urlroot="../..")
         return html_response(hash_template.render(params))
 
     def show_source(self, package):
@@ -368,12 +371,13 @@ class Application(object):
             oldentry = binpkgs.get(binary)
             if not (oldentry and oldentry["savable"] >= size):
                 binpkgs[binary] = entry
-        params = dict(source=package, packages=binpkgs)
+        params = dict(source=package, packages=binpkgs, urlroot="..")
         return html_response(source_template.render(params))
 
 def main():
     app = Application(sqlite3.connect("test.sqlite3"))
-    #app = DebuggedApplication(app, evalex=True)
+    staticdir = os.path.join(os.path.dirname(__file__), "static")
+    app = SharedDataMiddleware(app, {"/": staticdir})
     make_server("0.0.0.0", 8800, app).serve_forever()
 
 if __name__ == "__main__":
