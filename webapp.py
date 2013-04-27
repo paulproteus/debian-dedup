@@ -59,7 +59,7 @@ package_template = jinjaenv.from_string(
         <table border='1'><tr><th>package</th><th>files shared</th><th>data shared</th></tr>
         {%- for entry in sharing|sort(attribute="savable", reverse=true) -%}
             <tr><td{% if not entry.package or entry.package in dependencies %} class="dependency"{% endif %}>
-                {%- if entry.package %}<a href="{{ entry.package|e }}">{{ entry.package|e }}</a>{% else %}self{% endif %}
+                {%- if entry.package %}<a href="{{ entry.package|e }}"><span class="binary-package">{{ entry.package|e }}</span></a>{% else %}self{% endif %}
                 <a href="../compare/{{ package|e }}/{{ entry.package|default(package, true)|e }}">compare</a></td>
             <td>{{ entry.duplicate }} ({{ (100 * entry.duplicate / num_files)|int }}%)</td>
             <td>{{ entry.savable|format_size }} ({{ (100 * entry.savable / total_size)|int }}%)</td></tr>
@@ -100,7 +100,7 @@ hash_template = jinjaenv.from_string(
 <h1>{{ function|e }} {{ hashvalue|e }}</h1>
 <table border='1'><tr><th>package</th><th>filename</th><th>size</th><th>different function</th></tr>
 {%- for entry in entries -%}
-    <tr><td><a href="../../binary/{{ entry.package|e }}">{{ entry.package|e }}</a></td>
+    <tr><td><a href="../../binary/{{ entry.package|e }}"><span class="binary-package">{{ entry.package|e }}</span></a></td>
     <td><span class="filename">{{ entry.filename|e }}</span></td><td>{{ entry.size|format_size }}</td>
     <td>{% if function != entry.function %}{{ entry.function|e }}{% endif %}</td></tr>
 {%- endfor -%}
@@ -160,9 +160,9 @@ source_template = jinjaenv.from_string(
 <h1>overview of {{ source|e }}</h1>
 <table border='1'><tr><th>binary from {{ source|e }}</th><th>savable</th><th>other package</th></tr>
 {% for package, sharing in packages.items() %}
-    <tr><td><a href="../binary/{{ package|e }}">{{ package|e }}</td><td>
+    <tr><td><a href="../binary/{{ package|e }}"><span class="binary-package">{{ package|e }}</span></td><td>
     {%- if sharing -%}
-        {{ sharing.savable|format_size }}</td><td><a href="../binary/{{ sharing.package|e }}">{{ sharing.package|e }}</a> <a href="../compare/{{ package|e }}/{{ sharing.package|e }}">compare</a>
+        {{ sharing.savable|format_size }}</td><td><a href="../binary/{{ sharing.package|e }}"><span class="binary-package">{{ sharing.package|e }}</span></a> <a href="../compare/{{ package|e }}/{{ sharing.package|e }}">compare</a>
     {%- else -%}</td><td>{%- endif -%}
     </td></tr>
 {% endfor %}
