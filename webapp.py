@@ -78,7 +78,7 @@ detail_template = jinjaenv.from_string(
 <table border='1'><tr><th colspan="2">{{ details1.package|e }}</th><th colspan="2">{{ details2.package|e }}</th></tr>
 <tr><th>size</th><th>filename</th><th>hash functions</th><th>filename</th></tr>
 {%- for entry in shared -%}
-    <tr><td rowspan={{ entry.matches|length }}>{{ entry.size|format_size }}</td><td rowspan={{ entry.matches|length }}>
+    <tr><td{% if entry.matches|length > 1 %} rowspan={{ entry.matches|length }}{% endif %}>{{ entry.size|format_size }}</td><td{% if entry.matches|length > 1 %} rowspan={{ entry.matches|length }}{% endif %}>
     {%- for filename in entry.filenames %}<span class="filename">{{ filename|e }}</span>{% endfor -%}</td><td>
     {% for filename, match in entry.matches.items() -%}
         {% if not loop.first %}<tr><td>{% endif -%}
