@@ -41,7 +41,8 @@ def function_combination(function1, function2):
         return function1
     return "%s -> %s" % (function1, function2)
 
-jinjaenv.filters["format_size"] = format_size
+# Workaround for jinja bug #59 (broken filesizeformat)
+jinjaenv.filters["filesizeformat"] = format_size
 
 base_template = jinjaenv.get_template("base.html")
 
@@ -52,7 +53,7 @@ package_template = jinjaenv.from_string(
 <p>Version: {{ version|e }}</p>
 <p>Architecture: {{ architecture|e }}</p>
 <p>Number of files: {{ num_files }}</p>
-<p>Total size: {{ total_size|format_size }}</p>
+<p>Total size: {{ total_size|filesizeformat }}</p>
 {%- if shared -%}
     {%- for function, sharing in shared.items() -%}
         <h3>sharing with respect to {{ function|e }}</h3>
@@ -62,7 +63,7 @@ package_template = jinjaenv.from_string(
                 {%- if entry.package %}<a href="{{ entry.package|e }}"><span class="binary-package">{{ entry.package|e }}</span></a>{% else %}self{% endif %}
                 <a href="../compare/{{ package|e }}/{{ entry.package|default(package, true)|e }}">compare</a></td>
             <td>{{ entry.duplicate }} ({{ (100 * entry.duplicate / num_files)|int }}%)</td>
-            <td>{{ entry.savable|format_size }} ({{ (100 * entry.savable / total_size)|int }}%)</td></tr>
+            <td>{{ entry.savable|filesizeformat }} ({{ (100 * entry.savable / total_size)|int }}%)</td></tr>
         {%- endfor -%}
         </table>
     {%- endfor -%}
@@ -78,7 +79,7 @@ detail_template = jinjaenv.from_string(
 <table border='1'><tr><th colspan="2">{{ details1.package|e }}</th><th colspan="2">{{ details2.package|e }}</th></tr>
 <tr><th>size</th><th>filename</th><th>hash functions</th><th>filename</th></tr>
 {%- for entry in shared -%}
-    <tr><td{% if entry.matches|length > 1 %} rowspan={{ entry.matches|length }}{% endif %}>{{ entry.size|format_size }}</td><td{% if entry.matches|length > 1 %} rowspan={{ entry.matches|length }}{% endif %}>
+    <tr><td{% if entry.matches|length > 1 %} rowspan={{ entry.matches|length }}{% endif %}>{{ entry.size|filesizeformat }}</td><td{% if entry.matches|length > 1 %} rowspan={{ entry.matches|length }}{% endif %}>
     {%- for filename in entry.filenames %}<span class="filename">{{ filename|e }}</span>{% endfor -%}</td><td>
     {% for filename, match in entry.matches.items() -%}
         {% if not loop.first %}<tr><td>{% endif -%}
@@ -101,7 +102,7 @@ hash_template = jinjaenv.from_string(
 <table border='1'><tr><th>package</th><th>filename</th><th>size</th><th>different function</th></tr>
 {%- for entry in entries -%}
     <tr><td><a href="../../binary/{{ entry.package|e }}"><span class="binary-package">{{ entry.package|e }}</span></a></td>
-    <td><span class="filename">{{ entry.filename|e }}</span></td><td>{{ entry.size|format_size }}</td>
+    <td><span class="filename">{{ entry.filename|e }}</span></td><td>{{ entry.size|filesizeformat }}</td>
     <td>{% if function != entry.function %}{{ entry.function|e }}{% endif %}</td></tr>
 {%- endfor -%}
 </table>
@@ -162,7 +163,7 @@ source_template = jinjaenv.from_string(
 {% for package, sharing in packages.items() %}
     <tr><td><a href="../binary/{{ package|e }}"><span class="binary-package">{{ package|e }}</span></td><td>
     {%- if sharing -%}
-        {{ sharing.savable|format_size }}</td><td><a href="../binary/{{ sharing.package|e }}"><span class="binary-package">{{ sharing.package|e }}</span></a> <a href="../compare/{{ package|e }}/{{ sharing.package|e }}">compare</a>
+        {{ sharing.savable|filesizeformat }}</td><td><a href="../binary/{{ sharing.package|e }}"><span class="binary-package">{{ sharing.package|e }}</span></a> <a href="../compare/{{ package|e }}/{{ sharing.package|e }}">compare</a>
     {%- else -%}</td><td>{%- endif -%}
     </td></tr>
 {% endfor %}
