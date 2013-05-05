@@ -161,7 +161,7 @@ source_template = jinjaenv.from_string(
 <h1>overview of {{ source|e }}</h1>
 <table border='1'><tr><th>binary from {{ source|e }}</th><th>savable</th><th>other package</th></tr>
 {% for package, sharing in packages.items() %}
-    <tr><td><a href="../binary/{{ package|e }}"><span class="binary-package">{{ package|e }}</span></td><td>
+    <tr><td><a href="../binary/{{ package|e }}"><span class="binary-package">{{ package|e }}</span></a></td><td>
     {%- if sharing -%}
         {{ sharing.savable|filesizeformat }}</td><td><a href="../binary/{{ sharing.package|e }}"><span class="binary-package">{{ sharing.package|e }}</span></a> <a href="../compare/{{ package|e }}/{{ sharing.package|e }}">compare</a>
     {%- else -%}</td><td>{%- endif -%}
