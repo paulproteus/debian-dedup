@@ -76,6 +76,12 @@ detail_template = jinjaenv.from_string(
 {% block title %}sharing between {{ details1.package|e }} and {{ details2.package|e }}{% endblock%}
 {% block content %}
 <h1><a href="../../binary/{{ details1.package|e }}">{{ details1.package|e }}</a> &lt;-&gt; <a href="../../binary/{{ details2.package|e }}">{{ details2.package|e }}</a></h1>
+<p>Version of {{ details1.package|e }}: {{ details1.version|e }}</p>
+<p>Architecture of {{ details1.package|e }}: {{ details1.architecture|e }}</p>
+{%- if details1.package != details2.package -%}
+<p>Version of {{ details2.package|e }}: {{ details2.version|e }}</p>
+<p>Architecture of {{ details2.package|e }}: {{ details2.architecture|e }}</p>
+{%- endif -%}
 <table border='1'><tr><th colspan="2">{{ details1.package|e }}</th><th colspan="2">{{ details2.package|e }}</th></tr>
 <tr><th>size</th><th>filename</th><th>hash functions</th><th>filename</th></tr>
 {%- for entry in shared -%}
