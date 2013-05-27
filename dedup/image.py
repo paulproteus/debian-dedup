@@ -62,7 +62,10 @@ class ImageHash(object):
             elif img.mode == "RGB":
                 pack = lambda elem: struct.pack("BBBB", *(elem + (255,)))
             elif img.mode != "RGBA":
-                img = img.convert("RGBA")
+                try:
+                    img = img.convert("RGBA")
+                except (SyntaxError, IndexError, IOError): # crazy stuff from PIL
+                    raise ValueError("error reading png image")
             try:
                 for elem in img.getdata():
                     hashobj.update(pack(elem))
