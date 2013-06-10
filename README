@@ -1,7 +1,7 @@
 Required packages
 -----------------
 
-    aptitude install python python-debian python-lzma curl python-jinja2 python-werkzeug sqlite3 python-imaging
+    aptitude install python python-debian python-lzma curl python-jinja2 python-werkzeug sqlite3 python-imaging python-yaml python-concurrent.futures
 
 Create a database
 -----------------
@@ -15,13 +15,17 @@ permanent.
 
 Import packages
 ---------------
-Import individual packages by feeding them to importpkg.py:
+Import individual packages by feeding them to importpkg.py and readyaml.py:
 
-    ls -t /var/cache/apt/archives/*.deb | while read f; do echo $f; ./importpkg.py < $f || break; done
+    ./importpkg.py < somepkg.deb | ./readyaml.py
 
-Import a full mirror::
+You can import your local apt cache:
 
-    ./autoimport.py http://your.mirror.example/debian
+    ./autoimport.py /var/cache/apt/archives
+
+Import a full mirror (only http supported):
+
+    ./autoimport.py -n -p http://your.mirror.example/debian
 
 Viewing the results
 -------------------
