@@ -16,6 +16,8 @@ import concurrent.futures
 from debian import deb822
 from debian.debian_support import version_compare
 
+from readyaml import readyaml
+
 def process_http(pkgs, url):
     pkglist = urllib.urlopen(url + "/dists/sid/main/binary-amd64/Packages.gz").read()
     pkglist = gzip.GzipFile(fileobj=io.BytesIO(pkglist)).read()
@@ -115,9 +117,9 @@ def main():
             print("sqlimporting %s" % name)
             with open(inf) as inp:
                 try:
-                    subprocess.check_call(["python", "readyaml.py"], stdin=inp)
-                except subprocess.CalledProcessError:
-                    print("%s failed sql" % name)
+                    readyaml(db, inp)
+                except Exception as exc:
+                    print("%s failed sql with exception %r" % (name, exc))
                 else:
                     os.unlink(inf)
 

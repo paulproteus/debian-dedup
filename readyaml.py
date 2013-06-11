@@ -8,11 +8,10 @@ import sys
 from debian.debian_support import version_compare
 import yaml
 
-def main():
-    db = sqlite3.connect("test.sqlite3")
+def readyaml(db, stream):
     cur = db.cursor()
     cur.execute("PRAGMA foreign_keys = ON;")
-    gen = yaml.safe_load_all(sys.stdin)
+    gen = yaml.safe_load_all(stream)
     metadata = next(gen)
     package = metadata["package"]
     cur.execute("SELECT version FROM package WHERE package = ?;",
@@ -43,6 +42,10 @@ def main():
                         ((cid, func, hexhash)
                          for func, hexhash in entry["hashes"].items()))
     raise ValueError("missing commit block")
+
+def main():
+    db = sqlite3.connect("test.sqlite3")
+    readyaml(db, sys.stdin)
 
 if __name__ == "__main__":
     main()
