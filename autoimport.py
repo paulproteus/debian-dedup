@@ -29,18 +29,25 @@ def process_http(pkgs, url):
         pkgs[name] = dict(version=pkg["Version"],
                           filename="%s/%s" % (url, pkg["Filename"]))
 
+def process_file(pkgs, filename):
+    base = os.path.basename(filename)
+    if not base.endswith(".deb"):
+        raise ValueError("filename does not end in .deb")
+    parts = base.split("_")
+    if len(parts) != 3:
+        raise ValueError("filename not in form name_version_arch.deb")
+    name, version, _ = parts
+    version = urllib.unquote(version)
+    if name in pkgs and version_compare(pkgs[name]["version"], version) > 0:
+        return
+    pkgs[name] = dict(version=version, filename=filename)
+
 def process_dir(pkgs, d):
     for entry in os.listdir(d):
-        if not entry.endswith(".deb"):
-            continue
-        parts = entry.split("_")
-        if len(parts) != 3:
-            continue
-        name, version, _ = parts
-        version = urllib.unquote(version)
-        if name in pkgs and version_compare(pkgs[name]["version"], version) > 0:
-            continue
-        pkgs[name] = dict(version=version, filename=os.path.join(d, entry))
+        try:
+            process_file(pkgs, os.path.join(d, entry))
+        except ValueError:
+            pass
 
 def process_pkg(name, filename):
     print("importing %s" % filename)
@@ -78,8 +85,10 @@ def main():
         print("processing %s" % d)
         if d.startswith("http://"):
             process_http(pkgs, d)
-        else:
+        elif os.path.isdir(d):
             process_dir(pkgs, d)
+        else:
+            process_file(pkgs, d)
 
     print("reading database")
     cur.execute("SELECT package, version FROM package;")
