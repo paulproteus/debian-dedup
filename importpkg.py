@@ -1,14 +1,18 @@
 #!/usr/bin/python
+"""This tool reads a debian package from stdin and emits a yaml stream on
+stdout.  It does not access a database. Therefore it can be run in parallel and
+on multiple machines. The generated yaml conatins multiple documents. The first
+document contains package metadata. Then a document is emitted for each file.
+And finally a document consisting of the string "commit" is emitted."""
 
 import hashlib
-import sqlite3
 import sys
 import tarfile
 import zlib
 
-from debian.debian_support import version_compare
 from debian import deb822
 import lzma
+import yaml
 
 from dedup.arreader import ArReader
 from dedup.hashing import HashBlacklist, DecompressedHash, SuppressingHash, hash_file
@@ -57,17 +61,16 @@ def get_hashes(tar):
                 hashes[hashobj.name] = hashvalue
         yield (elem.name, elem.size, hashes)
 
-def process_package(db, filelike):
-    cur = db.cursor()
-    cur.execute("PRAGMA foreign_keys = ON;")
+def process_package(filelike):
     af = ArReader(filelike)
     af.read_magic()
     state = "start"
-    while True:
+    while state not in ("finished", "skipped"):
         try:
             name = af.read_entry()
         except EOFError:
-            break
+            if state != "finished":
+                raise ValueError("data.tar not found")
         if name == "control.tar.gz":
             if state != "start":
                 raise ValueError("unexpected control.tar.gz")
@@ -89,23 +92,11 @@ def process_package(db, filelike):
                 version = control["version"].encode("ascii")
                 architecture = control["architecture"].encode("ascii")
 
-                cur.execute("SELECT version FROM package WHERE package = ?;",
-                            (package,))
-                row = cur.fetchone()
-                if row and version_compare(row[0], version) > 0:
-                    return # already seen a newer package
-
-                cur.execute("DELETE FROM content WHERE package = ?;",
-                            (package,))
-                cur.execute("INSERT OR REPLACE INTO package (package, version, architecture, source) VALUES (?, ?, ?, ?);",
-                            (package, version, architecture, source))
                 depends = control.relations.get("depends", [])
                 depends = set(dep[0]["name"].encode("ascii")
                               for dep in depends if len(dep) == 1)
-                cur.execute("DELETE FROM dependency WHERE package = ?;",
-                            (package,))
-                cur.executemany("INSERT INTO dependency (package, required) VALUES (?, ?);",
-                                ((package, dep) for dep in depends))
+                yield dict(package=package, source=source, version=version,
+                           architecture=architecture, depends=depends)
                 break
             continue
         elif name == "data.tar.gz":
@@ -125,18 +116,12 @@ def process_package(db, filelike):
             except UnicodeDecodeError:
                 print("warning: skipping filename with encoding error")
                 continue # skip files with non-utf8 encoding for now
-            cur.execute("INSERT INTO content (package, filename, size) VALUES (?, ?, ?);",
-                        (package, name, size))
-            cid = cur.lastrowid
-            cur.executemany("INSERT INTO hash (cid, function, hash) VALUES (?, ?, ?);",
-                            ((cid, func, hexhash) for func, hexhash in hashes.items()))
-        db.commit()
-        return
-    raise ValueError("data.tar not found")
+            yield dict(name=name, size=size, hashes=hashes)
+        state = "finished"
+        yield "commit"
 
 def main():
-    db = sqlite3.connect("test.sqlite3")
-    process_package(db, sys.stdin)
+    yaml.safe_dump_all(process_package(sys.stdin), sys.stdout)
 
 if __name__ == "__main__":
     main()
