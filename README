@@ -27,6 +27,10 @@ Import a full mirror (only http supported):
 
     ./autoimport.py -n -p http://your.mirror.example/debian
 
+After changing the database, a few tables caching expensive computations need
+to be (re)generated. Execute `./update_sharing.py`. Without this step the web
+interface will report wrong results.
+
 Viewing the results
 -------------------
 Run `./webapp.py` and enjoy a webinterface at `0.0.0.0:8800` or inspect the
