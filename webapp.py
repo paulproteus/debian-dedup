@@ -248,67 +248,68 @@ class Application(object):
 
     def get_details(self, package):
         cur = self.db.cursor()
-        cur.execute("SELECT version, architecture FROM package WHERE package = ?;",
+        cur.execute("SELECT id, version, architecture FROM package WHERE name = ?;",
                     (package,))
         row = cur.fetchone()
         if not row:
             raise NotFound()
-        version, architecture = row
-        details = dict(package=package,
+        pid, version, architecture = row
+        details = dict(pid=pid,
+                       package=package,
                        version=version,
                        architecture=architecture)
-        cur.execute("SELECT count(filename), sum(size) FROM content WHERE package = ?;",
-                    (package,))
+        cur.execute("SELECT count(filename), sum(size) FROM content WHERE pid = ?;",
+                    (pid,))
         num_files, total_size = cur.fetchone()
         if total_size is None:
             total_size = 0
         details.update(dict(num_files=num_files, total_size=total_size))
         return details
 
-    def get_dependencies(self, package):
+    def get_dependencies(self, pid):
         cur = self.db.cursor()
-        cur.execute("SELECT required FROM dependency WHERE package = ?;",
-                    (package,))
+        cur.execute("SELECT required FROM dependency WHERE pid = ?;",
+                    (pid,))
         return set(row[0] for row in fetchiter(cur))
 
-    def cached_sharedstats(self, package):
+    def cached_sharedstats(self, pid):
         cur = self.db.cursor()
         sharedstats = {}
-        cur.execute("SELECT package2, func1, func2, files, size FROM sharing WHERE package1 = ?;",
-                    (package,))
-        for package2, func1, func2, files, size in fetchiter(cur):
+        cur.execute("SELECT pid2, package.name, func1, func2, files, size FROM sharing JOIN package ON sharing.pid2 = package.id WHERE pid1 = ?;",
+                    (pid,))
+        for pid2, package2, func1, func2, files, size in fetchiter(cur):
             if (func1, func2) not in hash_functions:
                 continue
             curstats = sharedstats.setdefault(
                     function_combination(func1, func2), list())
-            if package2 == package:
+            if pid2 == pid:
                 package2 = None
             curstats.append(dict(package=package2, duplicate=files, savable=size))
         return sharedstats
 
     def show_package(self, package):
         params = self.get_details(package)
-        params["dependencies"] = self.get_dependencies(package)
-        params["shared"] = self.cached_sharedstats(package)
+        params["dependencies"] = self.get_dependencies(params["pid"])
+        params["shared"] = self.cached_sharedstats(params["pid"])
         params["urlroot"] = ".."
         return html_response(package_template.render(params))
 
-    def compute_comparison(self, package1, package2):
+    def compute_comparison(self, pid1, pid2):
         """Compute a sequence of comparison objects ordery by the size of the
         object in the first package. Each element of the sequence is a dict
         defining the following keys:
-         * filenames: A set of filenames in package1 all referring to the
-           same object.
+         * filenames: A set of filenames in package 1 (pid1) all referring to
+           the same object.
          * size: Size of the object in bytes.
-         * matches: A mapping from filenames in package2 to a mapping from
-           hash function pairs to hash values.
+         * matches: A mapping from filenames in package 2 (pid2) to a mapping
+           from hash function pairs to hash values.
         """
         cur = self.db.cursor()
-        cur.execute("SELECT id, filename, size, hash FROM content JOIN hash ON content.id = hash.cid JOIN duplicate ON content.id = duplicate.cid WHERE package = ? AND function = 'sha512' ORDER BY size DESC;",
-                    (package1,))
+        cur.execute("SELECT id, filename, size, hash FROM content JOIN hash ON content.id = hash.cid JOIN duplicate ON content.id = duplicate.cid WHERE pid = ? AND function = 'sha512' ORDER BY size DESC;",
+                    (pid1,))
         cursize = -1
         files = dict()
-        minmatch = 2 if package1 == package2 else 1
+        minmatch = 2 if pid1 == pid2 else 1
         for cid, filename, size, hashvalue in fetchiter(cur):
             if cursize != size:
                 for entry in files.values():
@@ -325,8 +326,8 @@ class Application(object):
             files[hashvalue] = entry
 
             cur2 = self.db.cursor()
-            cur2.execute("SELECT ha.function, ha.hash, hb.function, filename FROM hash AS ha JOIN hash AS hb ON ha.hash = hb.hash JOIN content ON hb.cid = content.id WHERE ha.cid = ? AND package = ?;",
-                         (cid, package2))
+            cur2.execute("SELECT ha.function, ha.hash, hb.function, filename FROM hash AS ha JOIN hash AS hb ON ha.hash = hb.hash JOIN content ON hb.cid = content.id WHERE ha.cid = ? AND pid = ?;",
+                         (cid, pid2))
             for func1, hashvalue, func2, filename in fetchiter(cur2):
                 entry["matches"].setdefault(filename, {})[func1, func2] = \
                         hashvalue
@@ -342,7 +343,7 @@ class Application(object):
         if package1 != package2:
             details2 = self.get_details(package2)
 
-        shared = self.compute_comparison(package1, package2)
+        shared = self.compute_comparison(details1["pid"], details2["pid"])
         params = dict(
             details1=details1,
             details2=details2,
@@ -352,7 +353,7 @@ class Application(object):
 
     def show_hash(self, function, hashvalue):
         cur = self.db.cursor()
-        cur.execute("SELECT content.package, content.filename, content.size, hash.function FROM content JOIN hash ON content.id = hash.cid WHERE hash = ?;",
+        cur.execute("SELECT package.name, content.filename, content.size, hash.function FROM hash JOIN content ON hash.cid = content.id JOIN package ON content.pid = package.id WHERE hash = ?;",
                     (hashvalue,))
         entries = [dict(package=package, filename=filename, size=size,
                         function=otherfunc)
@@ -366,12 +367,12 @@ class Application(object):
 
     def show_source(self, package):
         cur = self.db.cursor()
-        cur.execute("SELECT package FROM package WHERE source = ?;",
+        cur.execute("SELECT name FROM package WHERE source = ?;",
                     (package,))
         binpkgs = dict.fromkeys(pkg for pkg, in fetchiter(cur))
         if not binpkgs:
             raise NotFound
-        cur.execute("SELECT package.package, sharing.package2, sharing.func1, sharing.func2, sharing.files, sharing.size FROM package JOIN sharing ON package.package = sharing.package1 WHERE package.source = ?;",
+        cur.execute("SELECT p1.name, p2.name, sharing.func1, sharing.func2, sharing.files, sharing.size FROM sharing JOIN package AS p1 ON sharing.pid1 = p1.id JOIN package AS p2 ON sharing.pid2 = p2.id WHERE p1.source = ?;",
                     (package,))
         for binary, otherbin, func1, func2, files, size in fetchiter(cur):
             entry = dict(package=otherbin,

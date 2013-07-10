@@ -14,29 +14,36 @@ def readyaml(db, stream):
     gen = yaml.safe_load_all(stream)
     metadata = next(gen)
     package = metadata["package"]
-    cur.execute("SELECT version FROM package WHERE package = ?;",
+    cur.execute("SELECT id, version FROM package WHERE name = ?;",
                     (package,))
     row = cur.fetchone()
-    if row and version_compare(row[0], metadata["version"]) > 0:
-        return
+    if row:
+        pid, version = row
+        if version_compare(version, metadata["version"]) > 0:
+            return
+    else:
+        pid = None
 
     cur.execute("BEGIN;")
-    cur.execute("DELETE FROM content WHERE package = ?;",
-                (package,))
-    cur.execute("INSERT OR REPLACE INTO package (package, version, architecture, source) VALUES (?, ?, ?, ?);",
-                (package, metadata["version"], metadata["architecture"],
-                 metadata["source"]))
-    cur.execute("DELETE FROM dependency WHERE package = ?;",
-                (package,))
-    cur.executemany("INSERT INTO dependency (package, required) VALUES (?, ?);",
-                    ((package, dep) for dep in metadata["depends"]))
+    if pid is not None:
+        cur.execute("DELETE FROM content WHERE pid = ?;", (pid,))
+        cur.execute("DELETE FROM dependency WHERE pid = ?;", (pid,))
+        cur.execute("UPDATE package SET version = ?, architecture = ?, source = ? WHERE id = ?;",
+                    (metadata["version"], metadata["architecture"], metadata["source"], pid))
+    else:
+        cur.execute("INSERT INTO package (name, version, architecture, source) VALUES (?, ?, ?, ?);",
+                    (package, metadata["version"], metadata["architecture"],
+                     metadata["source"]))
+        pid = cur.lastrowid
+    cur.executemany("INSERT INTO dependency (pid, required) VALUES (?, ?);",
+                    ((pid, dep) for dep in metadata["depends"]))
     for entry in gen:
         if entry == "commit":
             db.commit()
             return
 
-        cur.execute("INSERT INTO content (package, filename, size) VALUES (?, ?, ?);",
-                    (package, entry["name"], entry["size"]))
+        cur.execute("INSERT INTO content (pid, filename, size) VALUES (?, ?, ?);",
+                    (pid, entry["name"], entry["size"]))
         cid = cur.lastrowid
         cur.executemany("INSERT INTO hash (cid, function, hash) VALUES (?, ?, ?);",
                         ((cid, func, hexhash)
