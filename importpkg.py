@@ -61,6 +61,22 @@ def get_hashes(tar):
                 hashes[hashobj.name] = hashvalue
         yield (elem.name, elem.size, hashes)
 
+def process_control(control_contents):
+    control = deb822.Packages(control_contents)
+    package = control["package"].encode("ascii")
+    try:
+        source = control["source"].encode("ascii").split()[0]
+    except KeyError:
+        source = package
+    version = control["version"].encode("ascii")
+    architecture = control["architecture"].encode("ascii")
+
+    depends = set(dep[0]["name"].encode("ascii")
+                  for dep in control.relations.get("depends", ())
+                  if len(dep) == 1)
+    return dict(package=package, source=source, version=version,
+                architecture=architecture, depends=depends)
+
 def process_package(filelike):
     af = ArReader(filelike)
     af.read_magic()
@@ -82,21 +98,7 @@ def process_package(filelike):
                 if state != "control":
                     raise ValueError("duplicate control file")
                 state = "control_file"
-                control = tf.extractfile(elem).read()
-                control = deb822.Packages(control)
-                package = control["package"].encode("ascii")
-                try:
-                    source = control["source"].encode("ascii").split()[0]
-                except KeyError:
-                    source = package
-                version = control["version"].encode("ascii")
-                architecture = control["architecture"].encode("ascii")
-
-                depends = control.relations.get("depends", [])
-                depends = set(dep[0]["name"].encode("ascii")
-                              for dep in depends if len(dep) == 1)
-                yield dict(package=package, source=source, version=version,
-                           architecture=architecture, depends=depends)
+                yield process_control(tf.extractfile(elem).read())
                 break
             continue
         elif name == "data.tar.gz":
