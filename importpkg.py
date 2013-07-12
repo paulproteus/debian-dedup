@@ -81,12 +81,11 @@ def process_package(filelike):
     af = ArReader(filelike)
     af.read_magic()
     state = "start"
-    while state not in ("finished", "skipped"):
+    while True:
         try:
             name = af.read_entry()
         except EOFError:
-            if state != "finished":
-                raise ValueError("data.tar not found")
+            raise ValueError("data.tar not found")
         if name == "control.tar.gz":
             if state != "start":
                 raise ValueError("unexpected control.tar.gz")
@@ -119,8 +118,8 @@ def process_package(filelike):
                 print("warning: skipping filename with encoding error")
                 continue # skip files with non-utf8 encoding for now
             yield dict(name=name, size=size, hashes=hashes)
-        state = "finished"
         yield "commit"
+        break
 
 def main():
     yaml.safe_dump_all(process_package(sys.stdin), sys.stdout)
