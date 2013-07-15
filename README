@@ -38,17 +38,17 @@ SQL database by hand. Here are some example queries.
 
 Finding the 100 largest files shared with multiple packages.
 
-    SELECT a.package, a.filename, b.package, b.filename, a.size FROM content AS a JOIN hash AS ha ON a.id = ha.cid JOIN hash AS hb ON ha.hash = hb.hash JOIN content AS b ON b.id = hb.cid WHERE (a.package != b.package OR a.filename != b.filename) ORDER BY a.size DESC LIMIT 100;
+    SELECT pa.name, a.filename, pb.name, b.filename, a.size FROM content AS a JOIN hash AS ha ON a.id = ha.cid JOIN hash AS hb ON ha.hash = hb.hash JOIN content AS b ON b.id = hb.cid JOIN package AS pa ON b.pid = pa.id JOIN package AS pb ON b.pid = pb.id WHERE (a.pid != b.pid OR a.filename != b.filename) ORDER BY a.size DESC LIMIT 100;
 
 Finding those top 100 files that save most space when being reduced to only
 one copy in the archive.
 
-    SELECT hash, sum(size)-min(size), count(*), count(distinct package) FROM content JOIN hash ON content.id = hash.cid WHERE hash.function = "sha512" GROUP BY hash ORDER BY sum(size)-min(size) DESC LIMIT 100;
+    SELECT hash, sum(size)-min(size), count(*), count(distinct pid) FROM content JOIN hash ON content.id = hash.cid WHERE hash.function = "sha512" GROUP BY hash ORDER BY sum(size)-min(size) DESC LIMIT 100;
 
 Finding PNG images that do not carry a .png file extension.
 
-    SELECT package, filename, size FROM content JOIN hash ON content.id = hash.cid WHERE function = "image_sha512" AND filename NOT LIKE "%.png";
+    SELECT package.name, content.filename, content.size FROM content JOIN hash ON content.id = hash.cid JOIN package ON content.pid = package.id WHERE function = "image_sha512" AND filename NOT LIKE "%.png";
 
 Finding .gz files which either are not gziped or contain errors.
 
-    SELECT content.package, content.filename FROM content WHERE filename LIKE "%.gz" AND (SELECT count(*) FROM hash WHERE hash.cid = content.id AND hash.function = "gzip_sha512") = 0;
+    SELECT package.name, content.filename FROM content JOIN package ON content.pid = package.id WHERE filename LIKE "%.gz" AND (SELECT count(*) FROM hash WHERE hash.cid = content.id AND hash.function = "gzip_sha512") = 0;

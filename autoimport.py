@@ -93,7 +93,7 @@ def main():
             process_file(pkgs, d)
 
     print("reading database")
-    cur.execute("SELECT package, version FROM package;")
+    cur.execute("SELECT name, version FROM package;")
     knownpkgs = dict((row[0], row[1]) for row in cur.fetchall())
     distpkgs = set(pkgs.keys())
     if options.new:
@@ -126,7 +126,7 @@ def main():
     if options.prune:
         delpkgs = knownpkgs - distpkgs
         print("clearing packages %s" % " ".join(delpkgs))
-        cur.executemany("DELETE FROM package WHERE package = ?;",
+        cur.executemany("DELETE FROM package WHERE name = ?;",
                         ((pkg,) for pkg in delpkgs))
         # Tables content, dependency and sharing will also be pruned
         # due to ON DELETE CASCADE clauses.
