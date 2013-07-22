@@ -2,7 +2,7 @@ CREATE TABLE package (id INTEGER PRIMARY KEY, name TEXT UNIQUE, version TEXT, ar
 CREATE TABLE content (id INTEGER PRIMARY KEY, pid INTEGER, filename TEXT, size INTEGER, FOREIGN KEY (pid) REFERENCES package(id) ON DELETE CASCADE);
 CREATE TABLE hash (cid INTEGER, function TEXT, hash TEXT, FOREIGN KEY (cid) REFERENCES content(id) ON DELETE CASCADE);
 CREATE TABLE dependency (pid INTEGER, required TEXT, FOREIGN KEY (pid) REFERENCES package(id) ON DELETE CASCADE);
-CREATE INDEX content_package_index ON content (pid);
+CREATE INDEX content_package_size_index ON content (pid, size);
 CREATE INDEX hash_cid_index ON hash (cid);
 CREATE INDEX hash_hash_index ON hash (hash);
 
