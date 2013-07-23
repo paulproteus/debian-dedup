@@ -275,7 +275,7 @@ class Application(object):
     def cached_sharedstats(self, pid):
         cur = self.db.cursor()
         sharedstats = {}
-        cur.execute("SELECT pid2, package.name, func1, func2, files, size FROM sharing JOIN package ON sharing.pid2 = package.id WHERE pid1 = ?;",
+        cur.execute("SELECT pid2, package.name, f1.name, f2.name, files, size FROM sharing JOIN package ON sharing.pid2 = package.id JOIN function AS f1 ON sharing.fid1 = f1.id JOIN function AS f2 ON sharing.fid2 = f2.id WHERE pid1 = ?;",
                     (pid,))
         for pid2, package2, func1, func2, files, size in fetchiter(cur):
             if (func1, func2) not in hash_functions:
@@ -305,7 +305,7 @@ class Application(object):
            from hash function pairs to hash values.
         """
         cur = self.db.cursor()
-        cur.execute("SELECT id, filename, size, hash FROM content JOIN hash ON content.id = hash.cid JOIN duplicate ON content.id = duplicate.cid WHERE pid = ? AND function = 'sha512' ORDER BY size DESC;",
+        cur.execute("SELECT content.id, content.filename, content.size, hash.hash FROM content JOIN hash ON content.id = hash.cid JOIN duplicate ON content.id = duplicate.cid JOIN function ON hash.fid = function.id WHERE pid = ? AND function.name = 'sha512' ORDER BY size DESC;",
                     (pid1,))
         cursize = -1
         files = dict()
@@ -326,7 +326,7 @@ class Application(object):
             files[hashvalue] = entry
 
             cur2 = self.db.cursor()
-            cur2.execute("SELECT ha.function, ha.hash, hb.function, filename FROM hash AS ha JOIN hash AS hb ON ha.hash = hb.hash JOIN content ON hb.cid = content.id WHERE ha.cid = ? AND pid = ?;",
+            cur2.execute("SELECT fa.name, ha.hash, fb.name, filename FROM hash AS ha JOIN hash AS hb ON ha.hash = hb.hash JOIN content ON hb.cid = content.id JOIN function AS fa ON ha.fid = fa.id JOIN function AS fb ON hb.fid = fb.id WHERE ha.cid = ? AND pid = ?;",
                          (cid, pid2))
             for func1, hashvalue, func2, filename in fetchiter(cur2):
                 entry["matches"].setdefault(filename, {})[func1, func2] = \
@@ -353,7 +353,7 @@ class Application(object):
 
     def show_hash(self, function, hashvalue):
         cur = self.db.cursor()
-        cur.execute("SELECT package.name, content.filename, content.size, hash.function FROM hash JOIN content ON hash.cid = content.id JOIN package ON content.pid = package.id WHERE hash = ?;",
+        cur.execute("SELECT package.name, content.filename, content.size, function.name FROM hash JOIN content ON hash.cid = content.id JOIN package ON content.pid = package.id JOIN function ON hash.fid = function.id WHERE hash = ?;",
                     (hashvalue,))
         entries = [dict(package=package, filename=filename, size=size,
                         function=otherfunc)
@@ -372,7 +372,7 @@ class Application(object):
         binpkgs = dict.fromkeys(pkg for pkg, in fetchiter(cur))
         if not binpkgs:
             raise NotFound
-        cur.execute("SELECT p1.name, p2.name, sharing.func1, sharing.func2, sharing.files, sharing.size FROM sharing JOIN package AS p1 ON sharing.pid1 = p1.id JOIN package AS p2 ON sharing.pid2 = p2.id WHERE p1.source = ?;",
+        cur.execute("SELECT p1.name, p2.name, f1.name, f2.name, sharing.files, sharing.size FROM sharing JOIN package AS p1 ON sharing.pid1 = p1.id JOIN package AS p2 ON sharing.pid2 = p2.id JOIN function AS f1 ON sharing.fid1 = f1.id JOIN function AS f2 ON sharing.fid2 = f2.id WHERE p1.source = ?;",
                     (package,))
         for binary, otherbin, func1, func2, files, size in fetchiter(cur):
             entry = dict(package=otherbin,

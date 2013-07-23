@@ -45,7 +45,7 @@ def readyaml(db, stream):
         cur.execute("INSERT INTO content (pid, filename, size) VALUES (?, ?, ?);",
                     (pid, entry["name"], entry["size"]))
         cid = cur.lastrowid
-        cur.executemany("INSERT INTO hash (cid, function, hash) VALUES (?, ?, ?);",
+        cur.executemany("INSERT INTO hash (cid, fid, hash) VALUES (?, (SELECT id FROM function WHERE name = ?), ?);",
                         ((cid, func, hexhash)
                          for func, hexhash in entry["hashes"].items()))
     raise ValueError("missing commit block")
