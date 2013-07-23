@@ -193,27 +193,6 @@ def html_response(unicode_iterator, max_age=24 * 60 * 60):
     resp.expires = datetime.datetime.now() + datetime.timedelta(seconds=max_age)
     return resp
 
-def generate_shared(rows):
-    """internal helper from show_detail"""
-    entry = None
-    for filename1, size1, func1, filename2, size2, func2, hashvalue in rows:
-        funccomb = (func1, func2)
-        if funccomb not in hash_functions:
-            continue
-        if entry and (entry["filename1"] != filename1 or
-                      entry["filename2"] != filename2):
-            yield entry
-            entry = None
-        if entry:
-            funcdict = entry["functions"]
-        else:
-            funcdict = dict()
-            entry = dict(filename1=filename1, filename2=filename2, size1=size1,
-                         size2=size2, functions=funcdict)
-        funcdict[funccomb] = hashvalue
-    if entry:
-        yield entry
-
 class Application(object):
     def __init__(self, db):
         self.db = db
