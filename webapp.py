@@ -151,7 +151,7 @@ index_template = jinjaenv.from_string(
             <noscript><b>This form is disfunctional when javascript is not enabled</b></noscript>
             Enter binary package to inspect - Note: Non-existing packages will result in <b>404</b>-Errors
             <form id="pkg_form">
-                <label for="pkg_name">Name: <input type="text" size="30" name="pkg_name" id="pkg_name">
+                <label for="pkg_name">Name: </label><input type="text" size="30" name="pkg_name" id="pkg_name">
                 <input type="submit" value="Go"> Permanent Link: <a id="perma_link" href="#"></a>
             </form>
     </fieldset></div></li>
