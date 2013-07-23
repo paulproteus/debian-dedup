@@ -38,7 +38,7 @@ SQL database by hand. Here are some example queries.
 
 Finding the 100 largest files shared with multiple packages.
 
-    SELECT pa.name, a.filename, pb.name, b.filename, a.size FROM content AS a JOIN hash AS ha ON a.id = ha.cid JOIN hash AS hb ON ha.hash = hb.hash JOIN content AS b ON b.id = hb.cid JOIN package AS pa ON b.pid = pa.id JOIN package AS pb ON b.pid = pb.id WHERE (a.pid != b.pid OR a.filename != b.filename) ORDER BY a.size DESC LIMIT 100;
+    SELECT pa.name, a.filename, pb.name, b.filename, a.size FROM content AS a JOIN hash AS ha ON a.id = ha.cid JOIN hash AS hb ON ha.hash = hb.hash JOIN content AS b ON b.id = hb.cid JOIN package AS pa ON a.pid = pa.id JOIN package AS pb ON b.pid = pb.id WHERE (a.pid != b.pid OR a.filename != b.filename) ORDER BY a.size DESC LIMIT 100;
 
 Finding those top 100 files that save most space when being reduced to only
 one copy in the archive.
