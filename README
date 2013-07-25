@@ -47,7 +47,7 @@ one copy in the archive.
 
 Finding PNG images that do not carry a .png file extension.
 
-    SELECT package.name, content.filename, content.size FROM content JOIN hash ON content.id = hash.cid JOIN package ON content.pid = package.id WHERE function = "image_sha512" AND filename NOT LIKE "%.png";
+    SELECT package.name, content.filename, content.size FROM content JOIN hash ON content.id = hash.cid JOIN package ON content.pid = package.id WHERE function = "image_sha512" AND lower(filename) NOT LIKE "%.png";
 
 Finding .gz files which either are not gziped or contain errors.
 
