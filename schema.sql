@@ -9,3 +9,4 @@ CREATE INDEX hash_hash_index ON hash (hash);
 CREATE TABLE sharing (pid1 INTEGER, pid2 INTEGER, func1 TEXT, func2 TEXT, files INTEGER, size INTEGER, FOREIGN KEY (pid1) REFERENCES package(id) ON DELETE CASCADE, FOREIGN KEY (pid2) REFERENCES package(id) ON DELETE CASCADE);
 CREATE INDEX sharing_insert_index ON sharing (pid1, pid2, func1, func2);
 CREATE TABLE duplicate (cid INTEGER PRIMARY KEY, FOREIGN KEY (cid) REFERENCES content(id) ON DELETE CASCADE);
+CREATE TABLE issue (cid INTEGER REFERENCES content(id) ON DELETE CASCADE, issue TEXT);

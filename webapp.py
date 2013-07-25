@@ -69,6 +69,14 @@ package_template = jinjaenv.from_string(
     {%- endfor -%}
 <p>Note: Packages with yellow background are required to be installed when this package is installed.</p>
 {%- endif -%}
+{%- if issues -%}
+    <h3>issues with particular files</h3>
+    <table border='1'><tr><th>filename</th><th>issue</th></tr>
+    {%- for filename, issue in issues|dictsort(true) -%}
+        <tr><td><span class="filename">{{ filename|e }}</span></td><td>{{ issue|e }}</td></tr>
+    {%- endfor -%}
+    </table>
+{%- endif -%}
 {% endblock %}""")
 
 detail_template = jinjaenv.from_string(
@@ -271,6 +279,11 @@ class Application(object):
         params["dependencies"] = self.get_dependencies(params["pid"])
         params["shared"] = self.cached_sharedstats(params["pid"])
         params["urlroot"] = ".."
+        cur = self.db.cursor()
+        cur.execute("SELECT content.filename, issue.issue FROM content JOIN issue ON content.id = issue.cid WHERE content.pid = ?;",
+                    (params["pid"],))
+        params["issues"] = dict(cur.fetchall())
+        cur.close()
         return html_response(package_template.render(params))
 
     def compute_comparison(self, pid1, pid2):

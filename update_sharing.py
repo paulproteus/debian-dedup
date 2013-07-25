@@ -43,6 +43,7 @@ def main():
     cur.execute("PRAGMA foreign_keys = ON;")
     cur.execute("DELETE FROM sharing;")
     cur.execute("DELETE FROM duplicate;")
+    cur.execute("DELETE FROM issue;")
     readcur = db.cursor()
     readcur.execute("SELECT hash FROM hash GROUP BY hash HAVING count(*) > 1;")
     for hashvalue, in fetchiter(readcur):
@@ -54,6 +55,8 @@ def main():
         cur.executemany("INSERT OR IGNORE INTO duplicate (cid) VALUES (?);",
                         [(row[1],) for row in rows])
         process_pkgdict(cur, pkgdict)
+    cur.execute("INSERT INTO issue (cid, issue) SELECT content.id, 'file named something.gz is not a valid gzip file' FROM content WHERE content.filename LIKE '%.gz' AND NOT EXISTS (SELECT 1 FROM hash WHERE hash.cid = content.id AND hash.function = 'gzip_sha512');")
+    cur.execute("INSERT INTO issue (cid, issue) SELECT content.id, 'png image not named something.png' FROM content JOIN hash ON content.id = hash.cid WHERE function = 'image_sha512' AND lower(filename) NOT LIKE '%.png';")
     db.commit()
 
 if __name__ == "__main__":
