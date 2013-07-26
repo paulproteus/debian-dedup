@@ -25,6 +25,8 @@ def readyaml(db, stream):
         pid = None
 
     cur.execute("BEGIN;")
+    cur.execute("SELECT name, id FROM function;")
+    funcmapping = dict(cur.fetchall())
     if pid is not None:
         cur.execute("DELETE FROM content WHERE pid = ?;", (pid,))
         cur.execute("DELETE FROM dependency WHERE pid = ?;", (pid,))
@@ -45,8 +47,8 @@ def readyaml(db, stream):
         cur.execute("INSERT INTO content (pid, filename, size) VALUES (?, ?, ?);",
                     (pid, entry["name"], entry["size"]))
         cid = cur.lastrowid
-        cur.executemany("INSERT INTO hash (cid, function, hash) VALUES (?, ?, ?);",
-                        ((cid, func, hexhash)
+        cur.executemany("INSERT INTO hash (cid, fid, hash) VALUES (?, ?, ?);",
+                        ((cid, funcmapping[func], hexhash)
                          for func, hexhash in entry["hashes"].items()))
     raise ValueError("missing commit block")
 
