@@ -29,7 +29,8 @@ def process_http(pkgs, url):
                 version_compare(pkgs[name]["version"], pkg["Version"]) > 0:
             continue
         pkgs[name] = dict(version=pkg["Version"],
-                          filename="%s/%s" % (url, pkg["Filename"]))
+                          filename="%s/%s" % (url, pkg["Filename"]),
+                          sha256hash=pkg["SHA256"])
 
 def process_file(pkgs, filename):
     base = os.path.basename(filename)
@@ -51,14 +52,18 @@ def process_dir(pkgs, d):
         except ValueError:
             pass
 
-def process_pkg(name, filename):
+def process_pkg(name, pkgdict):
+    filename = pkgdict["filename"]
     print("importing %s" % filename)
+    importcmd = ["python", "importpkg.py"]
+    if "sha256hash" in pkgdict:
+        importcmd.extend(["-H", pkgdict["sha256hash"]])
     if filename.startswith("http://"):
         with open(os.path.join("tmp", name), "w") as outp:
             dl = subprocess.Popen(["curl", "-s", filename],
                                   stdout=subprocess.PIPE, close_fds=True)
-            imp = subprocess.Popen(["python", "importpkg.py"], stdin=dl.stdout,
-                                   stdout=outp, close_fds=True)
+            imp = subprocess.Popen(importcmd, stdin=dl.stdout, stdout=outp,
+                                   close_fds=True)
             if imp.wait():
                 raise ValueError("importpkg failed")
             if dl.wait():
@@ -66,8 +71,8 @@ def process_pkg(name, filename):
     else:
         with open(filename) as inp:
             with open(os.path.join("tmp", name), "w") as outp:
-                subprocess.check_call(["python", "importpkg.py"], stdin=inp,
-                                      stdout=outp, close_fds=True)
+                subprocess.check_call(importcmd, stdin=inp, stdout=outp,
+                                      close_fds=True)
     print("preprocessed %s" % name)
 
 def main():
@@ -106,7 +111,7 @@ def main():
     with e:
         fs = {}
         for name, pkg in pkgs.items():
-            fs[e.submit(process_pkg, name, pkg["filename"])] = name
+            fs[e.submit(process_pkg, name, pkg)] = name
 
         for f in concurrent.futures.as_completed(fs.keys()):
             name = fs[f]

@@ -6,6 +6,7 @@ document contains package metadata. Then a document is emitted for each file.
 And finally a document consisting of the string "commit" is emitted."""
 
 import hashlib
+import optparse
 import sys
 import tarfile
 import zlib
@@ -15,7 +16,8 @@ import lzma
 import yaml
 
 from dedup.arreader import ArReader
-from dedup.hashing import HashBlacklist, DecompressedHash, SuppressingHash, hash_file
+from dedup.hashing import HashBlacklist, DecompressedHash, SuppressingHash, \
+    HashedStream, hash_file
 from dedup.compression import GzipDecompressor, DecompressedStream
 from dedup.image import ImageHash
 
@@ -121,8 +123,28 @@ def process_package(filelike):
         yield "commit"
         break
 
+def process_package_with_hash(filelike, sha256hash):
+    hstream = HashedStream(filelike, hashlib.sha256())
+    for elem in process_package(hstream):
+        if elem == "commit":
+            while hstream.read(4096):
+                pass
+            if hstream.hexdigest() != sha256hash:
+                raise ValueError("hash sum mismatch")
+            yield elem
+            break
+        yield elem
+
 def main():
-    yaml.safe_dump_all(process_package(sys.stdin), sys.stdout)
+    parser = optparse.OptionParser()
+    parser.add_option("-H", "--hash", action="store",
+                      help="verify that stdin hash given sha256 hash")
+    options, args = parser.parse_args()
+    if options.hash:
+        gen = process_package_with_hash(sys.stdin, options.hash)
+    else:
+        gen = process_package(sys.stdin)
+    yaml.safe_dump_all(gen, sys.stdout)
 
 if __name__ == "__main__":
     main()

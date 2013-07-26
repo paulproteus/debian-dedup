@@ -106,3 +106,22 @@ def hash_file(hashobj, filelike, blocksize=65536):
         hashobj.update(data)
         data = filelike.read(blocksize)
     return hashobj
+
+class HashedStream(object):
+    """A file-like object, that supports sequential reading and hashes the
+    contents on the fly."""
+    def __init__(self, filelike, hashobj):
+        """
+        @param filelike: a file-like object, that must support the read method
+        @param hashobj: a hashlib-like object providing update and hexdigest
+        """
+        self.filelike = filelike
+        self.hashobj = hashobj
+
+    def read(self, length):
+        data = self.filelike.read(length)
+        self.hashobj.update(data)
+        return data
+
+    def hexdigest(self):
+        return self.hashobj.hexdigest()
