@@ -1,7 +1,7 @@
 Required packages
 -----------------
 
-    aptitude install python python-debian python-lzma curl python-jinja2 python-werkzeug sqlite3 python-imaging python-yaml python-concurrent.futures
+    aptitude install python python-debian python-lzma curl python-jinja2 python-werkzeug sqlite3 python-imaging python-yaml python-concurrent.futures python-pkg-resources
 
 Create a database
 -----------------

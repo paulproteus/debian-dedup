@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}duplication of {{ package|e }}{% endblock %}
+{% block content %}<h1>{{ package|e }}</h1>
+<p>Version: {{ version|e }}</p>
+<p>Architecture: {{ architecture|e }}</p>
+<p>Number of files: {{ num_files }}</p>
+<p>Total size: {{ total_size|filesizeformat }}</p>
+{%- if shared -%}
+    {%- for function, sharing in shared.items() -%}
+        <h3>sharing with respect to {{ function|e }}</h3>
+        <table border='1'><tr><th>package</th><th>files shared</th><th>data shared</th></tr>
+        {%- for entry in sharing|sort(attribute="savable", reverse=true) -%}
+            <tr><td{% if not entry.package or entry.package in dependencies %} class="dependency"{% endif %}>
+                {%- if entry.package %}<a href="{{ entry.package|e }}"><span class="binary-package">{{ entry.package|e }}</span></a>{% else %}self{% endif -%}
+                <a href="../compare/{{ package|e }}/{{ entry.package|default(package, true)|e }}">compare</a></td>
+            <td>{{ entry.duplicate }} ({{ (100 * entry.duplicate / num_files)|int }}%)</td>
+            <td>{{ entry.savable|filesizeformat }} ({{ (100 * entry.savable / total_size)|int }}%)</td></tr>
+        {%- endfor -%}
+        </table>
+    {%- endfor -%}
+<p>Note: Packages with yellow background are required to be installed when this package is installed.</p>
+{%- endif -%}
+{%- if issues -%}
+    <h3>issues with particular files</h3>
+    <table border='1'><tr><th>filename</th><th>issue</th></tr>
+    {%- for filename, issue in issues|dictsort(true) -%}
+        <tr><td><span class="filename">{{ filename|e }}</span></td><td>{{ issue|e }}</td></tr>
+    {%- endfor -%}
+    </table>
+{%- endif -%}
+{% endblock %}
