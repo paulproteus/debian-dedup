@@ -1,7 +1,6 @@
 #!/usr/bin/python
 
 import datetime
-import os.path
 import sqlite3
 from wsgiref.simple_server import make_server
 
@@ -244,8 +243,7 @@ class Application(object):
 
 def main():
     app = Application(sqlite3.connect("test.sqlite3"))
-    staticdir = os.path.join(os.path.dirname(__file__), "static")
-    app = SharedDataMiddleware(app, {"/": staticdir})
+    app = SharedDataMiddleware(app, {"/": ("dedup", "static")})
     make_server("0.0.0.0", 8800, app).serve_forever()
 
 if __name__ == "__main__":
