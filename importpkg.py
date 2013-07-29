@@ -109,6 +109,8 @@ def process_package(filelike):
         elif name == "data.tar.xz":
             zf = DecompressedStream(af, lzma.LZMADecompressor())
             tf = tarfile.open(fileobj=zf, mode="r|")
+        elif name == "data.tar":
+            tf = tarfile.open(fileobj=af, mode="r|")
         else:
             continue
         if state != "control_file":
