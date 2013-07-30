@@ -11,7 +11,7 @@
         <table border='1'><tr><th>package</th><th>files shared</th><th>data shared</th></tr>
         {%- for entry in sharing|sort(attribute="savable", reverse=true) -%}
             <tr><td{% if not entry.package or entry.package in dependencies %} class="dependency"{% endif %}>
-                {%- if entry.package %}<a href="{{ entry.package|e }}"><span class="binary-package">{{ entry.package|e }}</span></a>{% else %}self{% endif -%}
+                {%- if entry.package %}<a href="{{ entry.package|e }}"><span class="binary-package">{{ entry.package|e }}</span></a>{% else %}self{% endif %}
                 <a href="../compare/{{ package|e }}/{{ entry.package|default(package, true)|e }}">compare</a></td>
             <td>{{ entry.duplicate }} ({{ (100 * entry.duplicate / num_files)|int }}%)</td>
             <td>{{ entry.savable|filesizeformat }} ({{ (100 * entry.savable / total_size)|int }}%)</td></tr>
