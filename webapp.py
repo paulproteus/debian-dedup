@@ -14,7 +14,10 @@ from dedup.utils import fetchiter
 
 hash_functions = [
         ("sha512", "sha512"),
-        ("image_sha512", "image_sha512"),
+        ("png_sha512", "png_sha512"),
+        ("png_sha512", "gif_sha512"),
+        ("gif_sha512", "png_sha512"),
+        ("gif_sha512", "gif_sha512"),
         ("gzip_sha512", "gzip_sha512"),
         ("sha512", "gzip_sha512"),
         ("gzip_sha512", "sha512")]
@@ -87,6 +90,11 @@ class Application(object):
             elif endpoint == "detail":
                 return self.show_detail(args["package1"], args["package2"])
             elif endpoint == "hash":
+                if args["function"] == "image_sha512":
+                    # backwards compatibility
+                    raise RequestRedirect("%s/hash/png_sha512/%s" %
+                                          (request.environ["SCRIPT_NAME"],
+                                           args["hashvalue"]))
                 return self.show_hash(args["function"], args["hashvalue"])
             elif endpoint == "index":
                 if not request.environ["PATH_INFO"]:

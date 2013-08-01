@@ -1,7 +1,7 @@
 CREATE TABLE package (id INTEGER PRIMARY KEY, name TEXT UNIQUE, version TEXT, architecture TEXT, source TEXT);
 CREATE TABLE content (id INTEGER PRIMARY KEY, pid INTEGER, filename TEXT, size INTEGER, FOREIGN KEY (pid) REFERENCES package(id) ON DELETE CASCADE);
 CREATE TABLE function (id INTEGER PRIMARY KEY, name TEXT UNIQUE NOT NULL);
-INSERT INTO function (name) VALUES ("sha512"), ("gzip_sha512"), ("image_sha512");
+INSERT INTO function (name) VALUES ("sha512"), ("gzip_sha512"), ("png_sha512"), ("gif_sha512");
 CREATE TABLE hash (cid INTEGER, fid INTEGER NOT NULL, hash TEXT, FOREIGN KEY (cid) REFERENCES content(id) ON DELETE CASCADE, FOREIGN KEY (fid) REFERENCES function(id));
 CREATE TABLE dependency (pid INTEGER, required TEXT, FOREIGN KEY (pid) REFERENCES package(id) ON DELETE CASCADE);
 CREATE INDEX content_package_size_index ON content (pid, size);

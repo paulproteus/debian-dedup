@@ -56,7 +56,8 @@ def main():
                         [(row[1],) for row in rows])
         process_pkgdict(cur, pkgdict)
     cur.execute("INSERT INTO issue (cid, issue) SELECT content.id, 'file named something.gz is not a valid gzip file' FROM content WHERE content.filename LIKE '%.gz' AND NOT EXISTS (SELECT 1 FROM hash JOIN function ON hash.fid = function.id WHERE hash.cid = content.id AND function.name = 'gzip_sha512');")
-    cur.execute("INSERT INTO issue (cid, issue) SELECT content.id, 'png image not named something.png' FROM content JOIN hash ON content.id = hash.cid JOIN function ON hash.fid = function.id WHERE function.name = 'image_sha512' AND lower(filename) NOT LIKE '%.png';")
+    cur.execute("INSERT INTO issue (cid, issue) SELECT content.id, 'png image not named something.png' FROM content JOIN hash ON content.id = hash.cid JOIN function ON hash.fid = function.id WHERE function.name = 'png_sha512' AND lower(filename) NOT LIKE '%.png';")
+    cur.execute("INSERT INTO issue (cid, issue) SELECT content.id, 'gif image not named something.gif' FROM content JOIN hash ON content.id = hash.cid JOIN function ON hash.fid = function.id WHERE function.name = 'gif_sha512' AND lower(filename) NOT LIKE '%.gif';")
     db.commit()
 
 if __name__ == "__main__":

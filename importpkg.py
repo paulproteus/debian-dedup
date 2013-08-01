@@ -19,7 +19,7 @@ from dedup.arreader import ArReader
 from dedup.hashing import HashBlacklist, DecompressedHash, SuppressingHash, \
     HashedStream, hash_file
 from dedup.compression import GzipDecompressor, DecompressedStream
-from dedup.image import ImageHash
+from dedup.image import GIFHash, PNGHash
 
 class MultiHash(object):
     def __init__(self, *hashes):
@@ -44,17 +44,24 @@ def gziphash():
     hashobj.name = "gzip_sha512"
     return HashBlacklist(hashobj, boring_sha512_hashes)
 
-def imagehash():
-    hashobj = ImageHash(hashlib.sha512())
+def pnghash():
+    hashobj = PNGHash(hashlib.sha512())
     hashobj = SuppressingHash(hashobj, (ValueError,))
-    hashobj.name = "image_sha512"
+    hashobj.name = "png_sha512"
+    return hashobj
+
+def gifhash():
+    hashobj = GIFHash(hashlib.sha512())
+    hashobj = SuppressingHash(hashobj, (ValueError,))
+    hashobj.name = "gif_sha512"
     return hashobj
 
 def get_hashes(tar):
     for elem in tar:
         if not elem.isreg(): # excludes hard links as well
             continue
-        hasher = MultiHash(sha512_nontrivial(), gziphash(), imagehash())
+        hasher = MultiHash(sha512_nontrivial(), gziphash(), pnghash(),
+                           gifhash())
         hasher = hash_file(hasher, tar.extractfile(elem))
         hashes = {}
         for hashobj in hasher.hashes:
