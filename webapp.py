@@ -12,16 +12,6 @@ from werkzeug.wsgi import SharedDataMiddleware
 
 from dedup.utils import fetchiter
 
-hash_functions = [
-        ("sha512", "sha512"),
-        ("png_sha512", "png_sha512"),
-        ("png_sha512", "gif_sha512"),
-        ("gif_sha512", "png_sha512"),
-        ("gif_sha512", "gif_sha512"),
-        ("gzip_sha512", "gzip_sha512"),
-        ("sha512", "gzip_sha512"),
-        ("gzip_sha512", "sha512")]
-
 jinjaenv = jinja2.Environment(loader=jinja2.PackageLoader("dedup", "templates"))
 
 def format_size(size):
@@ -135,11 +125,9 @@ class Application(object):
     def cached_sharedstats(self, pid):
         cur = self.db.cursor()
         sharedstats = {}
-        cur.execute("SELECT pid2, package.name, f1.name, f2.name, files, size FROM sharing JOIN package ON sharing.pid2 = package.id JOIN function AS f1 ON sharing.fid1 = f1.id JOIN function AS f2 ON sharing.fid2 = f2.id WHERE pid1 = ?;",
+        cur.execute("SELECT pid2, package.name, f1.name, f2.name, files, size FROM sharing JOIN package ON sharing.pid2 = package.id JOIN function AS f1 ON sharing.fid1 = f1.id JOIN function AS f2 ON sharing.fid2 = f2.id WHERE pid1 = ? AND f1.eqclass = f2.eqclass;",
                     (pid,))
         for pid2, package2, func1, func2, files, size in fetchiter(cur):
-            if (func1, func2) not in hash_functions:
-                continue
             curstats = sharedstats.setdefault(
                     function_combination(func1, func2), list())
             if pid2 == pid:
@@ -218,12 +206,11 @@ class Application(object):
 
     def show_hash(self, function, hashvalue):
         cur = self.db.cursor()
-        cur.execute("SELECT package.name, content.filename, content.size, function.name FROM hash JOIN content ON hash.cid = content.id JOIN package ON content.pid = package.id JOIN function ON hash.fid = function.id WHERE hash = ?;",
-                    (hashvalue,))
+        cur.execute("SELECT package.name, content.filename, content.size, f2.name FROM hash JOIN content ON hash.cid = content.id JOIN package ON content.pid = package.id JOIN function AS f2 ON hash.fid = f2.id JOIN function AS f1 ON f2.eqclass = f1.eqclass WHERE f1.name = ? AND hash = ?;",
+                    (function, hashvalue,))
         entries = [dict(package=package, filename=filename, size=size,
                         function=otherfunc)
-                   for package, filename, size, otherfunc in fetchiter(cur)
-                   if (function, otherfunc) in hash_functions]
+                   for package, filename, size, otherfunc in fetchiter(cur)]
         if not entries:
             raise NotFound()
         params = dict(function=function, hashvalue=hashvalue, entries=entries,
