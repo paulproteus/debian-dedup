@@ -1,4 +1,6 @@
-CREATE TABLE package (id INTEGER PRIMARY KEY, name TEXT UNIQUE, version TEXT, architecture TEXT, source TEXT);
+CREATE TABLE package (id INTEGER PRIMARY KEY, name TEXT, version TEXT, architecture TEXT, source TEXT);
+CREATE UNIQUE INDEX package_name_version_index ON package (name, version);
+
 CREATE TABLE content (id INTEGER PRIMARY KEY, pid INTEGER, filename TEXT, size INTEGER, FOREIGN KEY (pid) REFERENCES package(id) ON DELETE CASCADE);
 CREATE TABLE function (id INTEGER PRIMARY KEY, name TEXT UNIQUE NOT NULL, eqclass INTEGER);
 INSERT INTO function (name, eqclass) VALUES ("sha512", 1), ("gzip_sha512", 1), ("png_sha512", 2), ("gif_sha512", 2);
