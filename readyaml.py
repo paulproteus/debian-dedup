@@ -16,7 +16,12 @@ def readyaml(db, stream):
     package = metadata["package"]
     cur.execute("SELECT id, version FROM package WHERE name = ?;",
                     (package,))
-    row = cur.fetchone()
+    rows = cur.fetchall()
+    if rows:
+        row = sorted(rows, cmp=lambda row: -version_compare(row[1]))[0]
+    else:
+        row = None
+
     if row:
         pid, version = row
         if version_compare(version, metadata["version"]) > 0:
