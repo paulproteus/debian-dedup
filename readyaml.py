@@ -32,16 +32,24 @@ def readyaml(db, stream):
     cur.execute("BEGIN;")
     cur.execute("SELECT name, id FROM function;")
     funcmapping = dict(cur.fetchall())
-    if pid is not None:
-        cur.execute("DELETE FROM content WHERE pid = ?;", (pid,))
-        cur.execute("DELETE FROM dependency WHERE pid = ?;", (pid,))
-        cur.execute("UPDATE package SET version = ?, architecture = ?, source = ? WHERE id = ?;",
-                    (metadata["version"], metadata["architecture"], metadata["source"], pid))
-    else:
-        cur.execute("INSERT INTO package (name, version, architecture, source) VALUES (?, ?, ?, ?);",
-                    (package, metadata["version"], metadata["architecture"],
-                     metadata["source"]))
-        pid = cur.lastrowid
+
+    # First, delete all the old ones that we want to remove from the DB.
+    MAX_OLD_TO_KEEP = 1
+    if len(rows) > MAX_OLD_TO_KEEP:
+        for row in rows[1:]:
+            delete_pid = row[0]
+            cur.execute("DELETE FROM package WHERE id = ?;", (delete_pid,))
+            print >> sys.stderr, "EEK"
+
+    # If last one == this one, delete that too.
+    if version == metadata['version']:
+        cur.execute("DELETE FROM package WHERE id = ?;", (pid,))
+
+    # Then store the new data about our new package version.
+    cur.execute("INSERT INTO package (name, version, architecture, source) VALUES (?, ?, ?, ?);",
+                (package, metadata["version"], metadata["architecture"],
+                 metadata["source"]))
+    pid = cur.lastrowid
     cur.executemany("INSERT INTO dependency (pid, required) VALUES (?, ?);",
                     ((pid, dep) for dep in metadata["depends"]))
     for entry in gen:
