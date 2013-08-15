@@ -99,7 +99,17 @@ def main():
 
     print("reading database")
     cur.execute("SELECT name, version FROM package;")
-    knownpkgs = dict((row[0], row[1]) for row in cur.fetchall())
+    # Best fix: Do the version compare in SQL.
+    #
+    # Asheesh hack: do the version compare from Python on the line
+    # below. This will cause some sizeable memory blow-up for now,
+    # but it will do.
+    #
+    # In the future it'd be nice to move this to use the Postgres
+    # debversion extension.
+    knownpkgs = dict(
+        sorted(((row[0], row[1]) for row in cur.fetchall()),
+               cmp=lambda x, y: version_compare(x[1], y[1])))
     distpkgs = set(pkgs.keys())
     if options.new:
         for name in distpkgs:
