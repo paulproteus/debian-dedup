@@ -42,7 +42,7 @@ def readyaml(db, stream):
             print >> sys.stderr, "EEK"
 
     # If last one == this one, delete that too.
-    if version == metadata['version']:
+    if row and (version == metadata['version']):
         cur.execute("DELETE FROM package WHERE id = ?;", (pid,))
 
     # Then store the new data about our new package version.
